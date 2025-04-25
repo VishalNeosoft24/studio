@@ -59,7 +59,15 @@ export default {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+           'message-outbound': {
+             DEFAULT: 'hsl(var(--message-outbound-background))',
+             foreground: 'hsl(var(--foreground))' // Assuming default text color
+           },
+           'message-inbound': {
+             DEFAULT: 'hsl(var(--message-inbound-background))',
+             foreground: 'hsl(var(--foreground))' // Assuming default text color
+           }
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
