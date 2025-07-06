@@ -3,8 +3,8 @@ export type Contact = {
   name: string;
   avatarUrl: string;
   lastMessage: string;
-  timestamp: string; // Consider using Date object or a library like date-fns for real apps
-  online: boolean;
+  lastMessageTimestamp: string;
+  status: 'online' | string; // Can be 'online' or a 'last seen at...' string
   unreadCount?: number;
 };
 

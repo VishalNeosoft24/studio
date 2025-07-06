@@ -6,8 +6,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Trash2, XCircle, Ban, FileText, Image as ImageIcon, Camera, User, Vote } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock data - replace with API call in a real application
 const mockMessages: Message[] = [
@@ -20,14 +22,19 @@ const mockMessages: Message[] = [
 ];
 
 const mockContact: Contact = {
-    id: '1', name: 'Alice', avatarUrl: 'https://picsum.photos/id/101/50/50', lastMessage: 'Hey, how are you?', timestamp: '10:30 AM', online: true
+    id: '1', name: 'Alice', avatarUrl: 'https://picsum.photos/id/101/50/50', lastMessage: '', lastMessageTimestamp: '', status: 'online'
 };
 
 
 export default function ChatWindow() {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [newMessage, setNewMessage] = useState('');
   const [contact] = useState<Contact>(mockContact); // Assuming we always load Alice for now
+
+  const showToast = (title: string) => {
+    toast({ title: title, description: 'This feature is not yet implemented.' });
+  };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,28 +83,40 @@ export default function ChatWindow() {
            <Avatar className="h-10 w-10 mr-3 relative">
             <AvatarImage src={contact.avatarUrl} alt={contact.name} />
             <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-             {contact.online && (
+             {contact.status === 'online' && (
                  <Circle className="absolute bottom-0 right-0 h-3 w-3 fill-accent stroke-accent border-2 border-background rounded-full" />
               )}
           </Avatar>
           <div>
             <h2 className="font-semibold">{contact.name}</h2>
-            <p className="text-xs text-muted-foreground">{contact.online ? 'Online' : `Last seen ${contact.timestamp}`}</p>
+            <p className="text-xs text-muted-foreground">{contact.status === 'online' ? 'Online' : contact.status}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Video call')}>
             <Video className="h-5 w-5" />
             <span className="sr-only">Video call</span>
           </Button>
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Voice call')}>
             <Phone className="h-5 w-5" />
             <span className="sr-only">Voice call</span>
           </Button>
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-            <MoreVertical className="h-5 w-5" />
-            <span className="sr-only">More options</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                    <MoreVertical className="h-5 w-5" />
+                    <span className="sr-only">More options</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => showToast('Contact info')}><Info className="mr-2 h-4 w-4" /><span>Contact info</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Mute notifications')}><BellOff className="mr-2 h-4 w-4" /><span>Mute notifications</span></DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setMessages([]); showToast('Messages cleared'); }}><Trash2 className="mr-2 h-4 w-4" /><span>Clear messages</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Close chat')}><XCircle className="mr-2 h-4 w-4" /><span>Close chat</span></DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => showToast('Block contact')}><Ban className="mr-2 h-4 w-4" /><span>Block</span></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
 
@@ -121,14 +140,25 @@ export default function ChatWindow() {
 
       <CardFooter className="p-3 border-t bg-secondary">
         <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
+          <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0" onClick={() => showToast('Emoji picker')}>
             <Smile className="h-5 w-5" />
             <span className="sr-only">Add emoji</span>
           </Button>
-          <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
-            <Paperclip className="h-5 w-5" />
-            <span className="sr-only">Attach file</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                <Paperclip className="h-5 w-5" />
+                <span className="sr-only">Attach file</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => showToast('Attach Document')}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Attach Photos & Videos')}><ImageIcon className="mr-2 h-4 w-4" /><span>Photos & videos</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Open Camera')}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Share Contact')}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Create Poll')}><Vote className="mr-2 h-4 w-4" /><span>Poll</span></DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Input
             type="text"
             placeholder="Type a message"
