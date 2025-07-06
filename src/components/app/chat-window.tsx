@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, XCircle, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, XCircle, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -167,6 +167,48 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
     setMessages(prev => [...prev, messageToSend]);
     toast({ title: 'Poll created' });
   };
+
+  const handleSendAudio = () => {
+    const messageToSend: Message = {
+      id: `m${Date.now()}`,
+      sender: 'me',
+      type: 'audio',
+      text: '',
+      audio: { name: 'voice-message.mp3', duration: '0:34' },
+      timestamp: new Date(),
+      status: 'sent',
+    };
+    setMessages(prev => [...prev, messageToSend]);
+    toast({ title: 'Audio message sent' });
+  };
+
+  const handleSendLocation = () => {
+    const messageToSend: Message = {
+      id: `m${Date.now()}`,
+      sender: 'me',
+      type: 'location',
+      text: '',
+      location: { address: '123 Main Street, Anytown, USA' },
+      timestamp: new Date(),
+      status: 'sent',
+    };
+    setMessages(prev => [...prev, messageToSend]);
+    toast({ title: 'Location shared' });
+  };
+
+  const handleSendEvent = () => {
+    const messageToSend: Message = {
+      id: `m${Date.now()}`,
+      sender: 'me',
+      type: 'event',
+      text: '',
+      event: { title: 'Team Meeting', dateTime: new Date(new Date().getTime() + 24 * 60 * 60 * 1000) },
+      timestamp: new Date(),
+      status: 'sent',
+    };
+    setMessages(prev => [...prev, messageToSend]);
+    toast({ title: 'Event created' });
+  };
   
   const handleCapture = (dataUrl: string) => {
       setImageToSend(dataUrl);
@@ -299,6 +341,40 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
                             <p className="text-xs text-muted-foreground text-right">2 votes</p>
                         </div>
                       )}
+                       {msg.type === 'audio' && msg.audio && (
+                        <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 w-64 mb-1">
+                            <div className="flex items-center justify-center h-10 w-10 mr-3 bg-primary/20 rounded-full">
+                                <Music className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className='flex-1 overflow-hidden'>
+                                <p className="font-medium truncate">{msg.audio.name}</p>
+                                <p className="text-xs text-muted-foreground">{msg.audio.duration}</p>
+                            </div>
+                        </div>
+                      )}
+                      {msg.type === 'location' && msg.location && (
+                          <div className="relative w-64 h-32 mb-1 group">
+                              <Image src={`https://placehold.co/400x200.png`} layout="fill" objectFit="cover" className="rounded-md" alt="Location Map" data-ai-hint="map location" />
+                              <div className="absolute inset-0 bg-black/40 flex flex-col justify-end p-2 rounded-md">
+                                  <div className="flex items-center text-white">
+                                      <MapPin className="h-4 w-4 mr-1"/>
+                                      <p className="text-sm font-medium truncate">{msg.location.address}</p>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                      {msg.type === 'event' && msg.event && (
+                          <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 w-64 mb-1">
+                              <div className="flex items-center justify-center h-10 w-10 mr-3">
+                                  <CalendarPlus className="h-6 w-6 text-primary" />
+                              </div>
+                              <div className='flex-1 overflow-hidden'>
+                                  <p className="font-semibold truncate">{msg.event.title}</p>
+                                  <p className="text-xs text-muted-foreground">{format(msg.event.dateTime, 'PPp')}</p>
+                              </div>
+                              <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Event', 'This would open event details.')}>View</Button>
+                          </div>
+                      )}
                     {msg.text && <p className="text-sm">{msg.text}</p>}
                     <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                         <span className="text-xs text-muted-foreground">{format(msg.timestamp, 'p')}</span>
@@ -355,10 +431,13 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
                 <DropdownMenuItem onClick={handleSendDocument}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}><ImageIconLucide className="mr-2 h-4 w-4" /><span>Photos & videos</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}><ImageIconLucide className="mr-2 h-4 w-4" /><span>Gallery</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCameraOpen(true)}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSendAudio}><Music className="mr-2 h-4 w-4" /><span>Audio</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSendLocation}><MapPin className="mr-2 h-4 w-4" /><span>Location</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={handleShareContact}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSendPoll}><Vote className="mr-2 h-4 w-4" /><span>Poll</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSendEvent}><CalendarPlus className="mr-2 h-4 w-4" /><span>Event</span></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Input
