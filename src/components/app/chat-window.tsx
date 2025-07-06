@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, XCircle, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, XCircle, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +20,7 @@ import { getMockMessages } from '@/lib/mock-data';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 
-const EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', '🤔', '🔥', '😊', '😎', '💯'];
+const EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', '🤔', '🔥', '😊', '😎', '💯', '🙌', '😮', '😢', '🥰', '🤣', '🤩'];
 
 const DateSeparator = ({ date }: { date: Date }) => {
   let label = format(date, 'PPP'); // Fallback to full date format
@@ -55,6 +55,8 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
   
   const [isContactInfoOpen, setContactInfoOpen] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -65,17 +67,18 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
     }
   }, [messages]);
 
-
-  const showToast = (title: string) => {
-    toast({ title: title, description: 'This feature is not yet implemented.' });
+  const showToast = (title: string, description?: string) => {
+    toast({ title, description });
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim() === '' && !imageToSend) return;
 
+    let messageToSend: Message;
+
     if (imageToSend) {
-       const messageToSend: Message = {
+       messageToSend = {
         id: `m${Date.now()}`,
         sender: 'me',
         type: 'image',
@@ -84,10 +87,9 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
         timestamp: new Date(),
         status: 'sent',
        };
-       setMessages([...messages, messageToSend]);
        setImageToSend(null);
     } else {
-       const messageToSend: Message = {
+       messageToSend = {
         id: `m${Date.now()}`,
         sender: 'me',
         type: 'text',
@@ -95,12 +97,11 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
         timestamp: new Date(),
         status: 'sent',
        };
-       setMessages([...messages, messageToSend]);
     }
     
+    setMessages(prev => [...prev, messageToSend]);
     setNewMessage('');
     
-    // Simulate receiving a reply
     setIsTyping(true);
     setTimeout(() => {
         const reply: Message = {
@@ -124,6 +125,48 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
           };
           reader.readAsDataURL(file);
       }
+  };
+  
+  const handleSendDocument = () => {
+    const messageToSend: Message = {
+      id: `m${Date.now()}`,
+      sender: 'me',
+      type: 'document',
+      text: 'Project Briefing',
+      document: { name: 'project-brief.pdf', size: '1.2 MB' },
+      timestamp: new Date(),
+      status: 'sent',
+    };
+    setMessages(prev => [...prev, messageToSend]);
+    toast({ title: 'Document sent' });
+  };
+  
+  const handleShareContact = () => {
+    const messageToSend: Message = {
+      id: `m${Date.now()}`,
+      sender: 'me',
+      type: 'contact',
+      text: '',
+      contactInfo: { name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50' },
+      timestamp: new Date(),
+      status: 'sent',
+    };
+    setMessages(prev => [...prev, messageToSend]);
+    toast({ title: 'Contact shared' });
+  };
+  
+  const handleSendPoll = () => {
+    const messageToSend: Message = {
+      id: `m${Date.now()}`,
+      sender: 'me',
+      type: 'poll',
+      text: '',
+      poll: { question: 'Where should we go for lunch?', options: ['Italian Place', 'Sushi Bar', 'Taco Truck'] },
+      timestamp: new Date(),
+      status: 'sent',
+    };
+    setMessages(prev => [...prev, messageToSend]);
+    toast({ title: 'Poll created' });
   };
   
   const handleCapture = (dataUrl: string) => {
@@ -158,6 +201,20 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
 
     <Card className="flex flex-col h-full w-full rounded-none border-none shadow-none bg-transparent">
       <CardHeader className="p-3 border-b bg-secondary flex-row items-center justify-between">
+        {isSearchOpen ? (
+          <div className="flex items-center w-full">
+            <Search className="h-5 w-5 mr-2 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9 border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              autoFocus
+            />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setIsSearchOpen(false); setSearchQuery(''); }}><X className="h-5 w-5"/></Button>
+          </div>
+        ) : (
+        <>
         <div className="flex items-center">
            <Avatar className="h-10 w-10 mr-3 relative cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <AvatarImage src={contact.avatarUrl} alt={contact.name} />
@@ -172,8 +229,8 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Video call')}><Video className="h-5 w-5" /><span className="sr-only">Video call</span></Button>
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Voice call')}><Phone className="h-5 w-5" /><span className="sr-only">Voice call</span></Button>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Video call', 'This feature is not yet implemented.')}><Video className="h-5 w-5" /><span className="sr-only">Video call</span></Button>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => setIsSearchOpen(true)}><Search className="h-5 w-5" /><span className="sr-only">Search</span></Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-5 w-5" /><span className="sr-only">More options</span></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -186,6 +243,8 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        </>
+        )}
       </CardHeader>
 
       <CardContent className="flex-1 overflow-hidden p-0 relative">
@@ -200,10 +259,43 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
                 <div className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`message-bubble ${msg.sender === 'me' ? 'message-bubble-outbound' : 'message-bubble-inbound'}`}>
                     {msg.type === 'image' && msg.imageUrl && (
-                        <div className="relative w-64 h-64 mb-2">
+                        <div className="relative w-64 h-64 mb-1">
                           <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md"/>
                         </div>
                     )}
+                    {msg.type === 'document' && msg.document && (
+                        <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 mb-1">
+                          <FileText className="h-10 w-10 mr-3 text-primary" />
+                          <div>
+                            <p className="font-medium truncate">{msg.document.name}</p>
+                            <p className="text-xs text-muted-foreground">{msg.document.size}</p>
+                          </div>
+                        </div>
+                      )}
+                      {msg.type === 'contact' && msg.contactInfo && (
+                        <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 w-64 mb-1">
+                            <Avatar className="h-10 w-10 mr-3">
+                              <AvatarImage src={msg.contactInfo.avatarUrl} alt={msg.contactInfo.name} />
+                              <AvatarFallback>{msg.contactInfo.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className='flex-1 overflow-hidden'>
+                                <p className="font-medium truncate">{msg.contactInfo.name}</p>
+                                <p className='text-xs text-muted-foreground'>Contact</p>
+                            </div>
+                            <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Contact', 'This would open the contact info.')}>View</Button>
+                        </div>
+                      )}
+                      {msg.type === 'poll' && msg.poll && (
+                        <div className="space-y-2 w-64 mb-1">
+                            <p className="font-semibold">{msg.poll.question}</p>
+                            <div className="space-y-2">
+                              {msg.poll.options.map((option, i) => (
+                                <Button key={i} variant="outline" className="w-full justify-start" onClick={() => toast({title: `Voted for "${option}"`})}>{option}</Button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground text-right">2 votes</p>
+                        </div>
+                      )}
                     {msg.text && <p className="text-sm">{msg.text}</p>}
                     <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                         <span className="text-xs text-muted-foreground">{format(msg.timestamp, 'p')}</span>
@@ -246,7 +338,7 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-2">
-                <div className="grid grid-cols-6 gap-1">
+                <div className="grid grid-cols-8 gap-1">
                     {EMOJIS.map(emoji => (
                         <button key={emoji} type="button" onClick={() => setNewMessage(newMessage + emoji)} className="text-2xl rounded-md p-1 hover:bg-secondary transition-colors">{emoji}</button>
                     ))}
@@ -258,11 +350,11 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
               <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0"><Paperclip className="h-5 w-5" /><span className="sr-only">Attach file</span></Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => showToast('Attach Document')}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSendDocument}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={() => fileInputRef.current?.click()}><ImageIconLucide className="mr-2 h-4 w-4" /><span>Photos & videos</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCameraOpen(true)}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={() => showToast('Share Contact')}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={() => showToast('Create Poll')}><Vote className="mr-2 h-4 w-4" /><span>Poll</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShareContact}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSendPoll}><Vote className="mr-2 h-4 w-4" /><span>Poll</span></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Input
