@@ -6,34 +6,29 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Circle, MessageSquarePlus, MoreVertical, Users, CircleDashed } from 'lucide-react';
+import { Circle, MessageSquarePlus, MoreVertical, Users, CircleDashed, BellOff } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import ProfileSheet from './profile-sheet';
 
-// Mock data - replace with API call in a real application
-const mockContacts: Contact[] = [
-  { id: '1', name: 'Alice', avatarUrl: 'https://picsum.photos/id/101/50/50', lastMessage: 'Hey, how are you?', lastMessageTimestamp: '10:30 AM', status: 'online', unreadCount: 2 },
-  { id: '2', name: 'Bob', avatarUrl: 'https://picsum.photos/id/102/50/50', lastMessage: 'See you later!', lastMessageTimestamp: '9:15 AM', status: 'last seen 2 hours ago' },
-  { id: '3', name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50', lastMessage: 'Okay, sounds good.', lastMessageTimestamp: 'Yesterday', status: 'online', unreadCount: 5 },
-  { id: '4', name: 'David', avatarUrl: 'https://picsum.photos/id/104/50/50', lastMessage: 'Let me check that.', lastMessageTimestamp: 'Yesterday', status: 'last seen yesterday at 8:40 PM' },
-   { id: '5', name: 'Eve', avatarUrl: 'https://picsum.photos/id/105/50/50', lastMessage: 'Thanks!', lastMessageTimestamp: 'Mon', status: 'last seen on Monday' },
-   { id: '6', name: 'Frank', avatarUrl: 'https://picsum.photos/id/106/50/50', lastMessage: 'Can you send the file?', lastMessageTimestamp: 'Mon', status: 'online' },
-   { id: '7', name: 'Grace', avatarUrl: 'https://picsum.photos/id/107/50/50', lastMessage: '👍', lastMessageTimestamp: 'Sun', status: 'last seen recently', unreadCount: 1 },
-   { id: '8', name: 'Heidi', avatarUrl: 'https://picsum.photos/id/108/50/50', lastMessage: 'I will call you back.', lastMessageTimestamp: 'Sun', status: 'last seen a week ago' },
-];
+interface ContactListProps {
+  contacts: Contact[];
+  selectedContactId: string | null;
+  onSelectContact: (id: string) => void;
+}
 
-export default function ContactList() {
+export default function ContactList({ contacts, selectedContactId, onSelectContact }: ContactListProps) {
   const { toast } = useToast();
-  const [contacts] = useState<Contact[]>(mockContacts); // Use state for potential filtering/updates
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(mockContacts[0]?.id ?? null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
 
   const showToast = (title: string) => {
     toast({ title: title, description: 'This feature is not yet implemented.' });
   };
-
-  // TODO: Implement search functionality
+  
+  const filteredContacts = contacts.filter(contact => 
+    contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <>
@@ -78,14 +73,19 @@ export default function ContactList() {
           </div>
       </div>
       <div className="p-3 border-b">
-        <Input placeholder="Search or start new chat" className="bg-secondary border-none focus-visible:ring-primary" />
+        <Input 
+          placeholder="Search or start new chat" 
+          className="bg-secondary border-none focus-visible:ring-primary"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
       </div>
       <ScrollArea className="flex-1">
         <div className="p-0">
-          {contacts.map((contact) => (
+          {filteredContacts.map((contact) => (
             <button
               key={contact.id}
-              onClick={() => setSelectedContactId(contact.id)}
+              onClick={() => onSelectContact(contact.id)}
               className={`flex items-center w-full p-3 hover:bg-secondary transition-colors text-left ${selectedContactId === contact.id ? 'bg-secondary' : ''}`}
               aria-current={selectedContactId === contact.id ? 'page' : undefined}
             >
@@ -103,11 +103,14 @@ export default function ContactList() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
-                    {contact.unreadCount && contact.unreadCount > 0 && (
-                    <div className="bg-accent text-accent-foreground text-xs font-medium rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center flex-shrink-0">
-                        {contact.unreadCount}
+                    <div className='flex items-center space-x-2'>
+                      {contact.isMuted && <BellOff className="h-4 w-4 text-muted-foreground" />}
+                      {contact.unreadCount && contact.unreadCount > 0 && (
+                      <div className="bg-accent text-accent-foreground text-xs font-medium rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center flex-shrink-0">
+                          {contact.unreadCount}
+                      </div>
+                      )}
                     </div>
-                    )}
                 </div>
               </div>
             </button>
