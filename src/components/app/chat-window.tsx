@@ -15,22 +15,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import CameraViewDialog from './camera-view-dialog';
+import { getMockMessages } from '@/lib/mock-data';
 
 const EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', '🤔', '🔥', '😊', '😎', '💯'];
-
-// Mock message history for different contacts
-const getMockMessages = (contactId: string): Message[] => {
-  const baseMessages: Message[] = [
-    { id: 'm1', sender: 'contact', type: 'text', text: 'Hey, how are you?', timestamp: '10:28 AM' },
-    { id: 'm2', sender: 'me', type: 'text', text: 'Hi! I\'m good, thanks. How about you?', timestamp: '10:29 AM', status: 'read' },
-    { id: 'm3', sender: 'contact', type: 'text', text: 'Doing well! Just working on that report.', timestamp: '10:29 AM' },
-    { id: 'm4', sender: 'me', type: 'text', text: 'Ah, same here. Almost done?', timestamp: '10:30 AM', status: 'delivered' },
-    { id: 'm5', sender: 'contact', type: 'text', text: 'Yeah, pretty much. Need a break soon 😅', timestamp: '10:30 AM' },
-    { id: 'm6', sender: 'me', type: 'text', text: 'Tell me about it! Coffee later?', timestamp: '10:31 AM', status: 'sent' },
-  ];
-  // Simple logic to vary messages
-  return baseMessages.slice(0, 2 + (parseInt(contactId) % 5));
-};
 
 interface ChatWindowProps {
   contact: Contact;
