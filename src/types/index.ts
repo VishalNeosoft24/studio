@@ -5,6 +5,7 @@ export type Contact = {
   lastMessage: string;
   timestamp: string; // Consider using Date object or a library like date-fns for real apps
   online: boolean;
+  unreadCount?: number;
 };
 
 export type Message = {

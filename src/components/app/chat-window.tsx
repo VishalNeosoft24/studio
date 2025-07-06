@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { SendHorizonal, Check, CheckCheck, Circle } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 
 // Mock data - replace with API call in a real application
@@ -85,7 +85,20 @@ export default function ChatWindow() {
             <p className="text-xs text-muted-foreground">{contact.online ? 'Online' : `Last seen ${contact.timestamp}`}</p>
           </div>
         </div>
-        {/* Add more icons here (e.g., call, video, menu) */}
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <Video className="h-5 w-5" />
+            <span className="sr-only">Video call</span>
+          </Button>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <Phone className="h-5 w-5" />
+            <span className="sr-only">Voice call</span>
+          </Button>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+            <MoreVertical className="h-5 w-5" />
+            <span className="sr-only">More options</span>
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="flex-1 overflow-hidden p-0">
@@ -108,7 +121,14 @@ export default function ChatWindow() {
 
       <CardFooter className="p-3 border-t bg-secondary">
         <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          {/* Add attachment button here */}
+          <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
+            <Smile className="h-5 w-5" />
+            <span className="sr-only">Add emoji</span>
+          </Button>
+          <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
+            <Paperclip className="h-5 w-5" />
+            <span className="sr-only">Attach file</span>
+          </Button>
           <Input
             type="text"
             placeholder="Type a message"

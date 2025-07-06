@@ -4,19 +4,19 @@ import type { Contact } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Circle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Circle, MessageSquarePlus, MoreVertical, Users, CircleDashed } from 'lucide-react';
 import { useState } from 'react';
-import { Card, CardHeader } from '@/components/ui/card';
 
 // Mock data - replace with API call in a real application
 const mockContacts: Contact[] = [
-  { id: '1', name: 'Alice', avatarUrl: 'https://picsum.photos/id/101/50/50', lastMessage: 'Hey, how are you?', timestamp: '10:30 AM', online: true },
+  { id: '1', name: 'Alice', avatarUrl: 'https://picsum.photos/id/101/50/50', lastMessage: 'Hey, how are you?', timestamp: '10:30 AM', online: true, unreadCount: 2 },
   { id: '2', name: 'Bob', avatarUrl: 'https://picsum.photos/id/102/50/50', lastMessage: 'See you later!', timestamp: '9:15 AM', online: false },
-  { id: '3', name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50', lastMessage: 'Okay, sounds good.', timestamp: 'Yesterday', online: true },
+  { id: '3', name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50', lastMessage: 'Okay, sounds good.', timestamp: 'Yesterday', online: true, unreadCount: 5 },
   { id: '4', name: 'David', avatarUrl: 'https://picsum.photos/id/104/50/50', lastMessage: 'Let me check that.', timestamp: 'Yesterday', online: false },
    { id: '5', name: 'Eve', avatarUrl: 'https://picsum.photos/id/105/50/50', lastMessage: 'Thanks!', timestamp: 'Mon', online: false },
    { id: '6', name: 'Frank', avatarUrl: 'https://picsum.photos/id/106/50/50', lastMessage: 'Can you send the file?', timestamp: 'Mon', online: true },
-   { id: '7', name: 'Grace', avatarUrl: 'https://picsum.photos/id/107/50/50', lastMessage: '👍', timestamp: 'Sun', online: false },
+   { id: '7', name: 'Grace', avatarUrl: 'https://picsum.photos/id/107/50/50', lastMessage: '👍', timestamp: 'Sun', online: false, unreadCount: 1 },
    { id: '8', name: 'Heidi', avatarUrl: 'https://picsum.photos/id/108/50/50', lastMessage: 'I will call you back.', timestamp: 'Sun', online: false },
 ];
 
@@ -28,11 +28,33 @@ export default function ContactList() {
 
   return (
     <>
-      <Card className="rounded-none border-0 border-b shadow-none">
-        <CardHeader className="p-3">
-          <Input placeholder="Search or start new chat" className="bg-secondary border-none focus-visible:ring-primary" />
-        </CardHeader>
-      </Card>
+      <div className="p-3 border-b bg-secondary flex-row items-center justify-between flex">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src="https://picsum.photos/id/42/50/50" alt="My Avatar" data-ai-hint="profile person" />
+            <AvatarFallback>YOU</AvatarFallback>
+          </Avatar>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <Users className="h-5 w-5" />
+              <span className="sr-only">Communities</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <CircleDashed className="h-5 w-5" />
+              <span className="sr-only">Status</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <MessageSquarePlus className="h-5 w-5" />
+              <span className="sr-only">New Chat</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+              <MoreVertical className="h-5 w-5" />
+              <span className="sr-only">Menu</span>
+            </Button>
+          </div>
+      </div>
+      <div className="p-3 border-b">
+        <Input placeholder="Search or start new chat" className="bg-secondary border-none focus-visible:ring-primary" />
+      </div>
       <ScrollArea className="flex-1">
         <div className="p-0">
           {contacts.map((contact) => (
@@ -54,7 +76,14 @@ export default function ContactList() {
                   <h3 className="font-medium truncate">{contact.name}</h3>
                   <span className="text-xs text-muted-foreground">{contact.timestamp}</span>
                 </div>
-                <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
+                <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
+                    {contact.unreadCount && contact.unreadCount > 0 && (
+                    <div className="bg-accent text-accent-foreground text-xs font-medium rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center flex-shrink-0">
+                        {contact.unreadCount}
+                    </div>
+                    )}
+                </div>
               </div>
             </button>
           ))}
