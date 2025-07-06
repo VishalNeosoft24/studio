@@ -8,9 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, XCircle, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus, Timer, Wallpaper, Download, SquarePlus } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -67,7 +67,7 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
   }, [messages]);
 
   const showToast = (title: string, description?: string) => {
-    toast({ title, description });
+    toast({ title, description: description || 'This feature is not yet implemented.' });
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -279,12 +279,50 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-5 w-5" /><span className="sr-only">More options</span></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setContactInfoOpen(true)}><Info className="mr-2 h-4 w-4" /><span>Contact info</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={toggleMute}>{contact.isMuted ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}<span>{contact.isMuted ? 'Unmute' : 'Mute'} notifications</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setContactInfoOpen(true)}>
+                    <Info className="mr-2 h-4 w-4" />
+                    <span>Contact info</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={toggleMute}>
+                    {contact.isMuted ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}
+                    <span>{contact.isMuted ? 'Unmute' : 'Mute'} notifications</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Disappearing messages', 'This feature is not yet implemented.')}>
+                    <Timer className="mr-2 h-4 w-4" />
+                    <span>Disappearing messages</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => showToast('Wallpaper', 'This feature is not yet implemented.')}>
+                    <Wallpaper className="mr-2 h-4 w-4" />
+                    <span>Wallpaper</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { setMessages([]); toast({ title: 'Messages cleared' }); }}><Trash2 className="mr-2 h-4 w-4" /><span>Clear messages</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={onCloseChat}><XCircle className="mr-2 h-4 w-4" /><span>Close chat</span></DropdownMenuItem>
-                <DropdownMenuItem className={contact.isBlocked ? '' : 'text-destructive'} onClick={toggleBlock}><Ban className="mr-2 h-4 w-4" /><span>{contact.isBlocked ? 'Unblock' : 'Block'}</span></DropdownMenuItem>
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                        <span>More</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        <DropdownMenuItem onClick={() => showToast('Report', 'This feature is not yet implemented.')}>
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            <span>Report</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className={contact.isBlocked ? '' : 'text-destructive'} onClick={toggleBlock}>
+                            <Ban className="mr-2 h-4 w-4" />
+                            <span>{contact.isBlocked ? 'Unblock' : 'Block'}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setMessages([]); toast({ title: 'Chat cleared' }); }}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Clear chat</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Export chat', 'This feature is not yet implemented.')}>
+                            <Download className="mr-2 h-4 w-4" />
+                            <span>Export chat</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Add shortcut', 'This feature is not yet implemented.')}>
+                            <SquarePlus className="mr-2 h-4 w-4" />
+                            <span>Add shortcut</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
