@@ -13,42 +13,32 @@ export const initialContacts: Contact[] = [
 
 // Mock message history for different contacts
 export const getMockMessages = (contactId: string): Message[] => {
-  const baseMessages: Message[] = [
-    { id: 'm1', sender: 'contact', type: 'text', text: 'Hey, how are you?', timestamp: '10:28 AM' },
-    { id: 'm2', sender: 'me', type: 'text', text: 'Hi! I\'m good, thanks. How about you?', timestamp: '10:29 AM', status: 'read' },
-    { id: 'm3', sender: 'contact', type: 'text', text: 'Doing well! Just working on that report.', timestamp: '10:29 AM' },
-    { id: 'm4', sender: 'me', type: 'text', text: 'Ah, same here. Almost done?', timestamp: '10:30 AM', status: 'delivered' },
-    { id: 'm5', sender: 'contact', type: 'text', text: 'Yeah, pretty much. Need a break soon 😅', timestamp: '10:30 AM' },
-    { id: 'm6', sender: 'me', type: 'text', text: 'Tell me about it! Coffee later?', timestamp: '10:31 AM', status: 'sent' },
-  ];
-  // Simple logic to vary messages based on contact ID
-  const messageCount = 2 + (parseInt(contactId, 10) % 5);
-  const userMessages = [
-      "Great!", 
-      "How's your day going?", 
-      "What are you up to?", 
-      "Sounds good, let's connect later.",
-      "Can you resend that file?"
-  ];
-  const contactMessages = [
-      "Not much, just chilling.",
-      "Working on a new project.",
-      "I'm good, thanks for asking!",
-      "Sure, I'll send it right over.",
-      "Let's catch up tomorrow."
+  const now = new Date();
+
+  const getPastDate = (days: number, hours: number, minutes: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
+
+  const allMessages: Message[] = [
+    // Conversation from 2 days ago
+    { id: 'm1', sender: 'contact', type: 'text', text: 'Hey! Are we still on for the project discussion today?', timestamp: getPastDate(2, 10, 30) },
+    { id: 'm2', sender: 'me', type: 'text', text: 'Yes, absolutely! I\'m just wrapping up a few things. Give me an hour?', timestamp: getPastDate(2, 10, 31), status: 'read' },
+    { id: 'm3', sender: 'contact', type: 'text', text: 'Sure, sounds good. Ping me when you\'re ready.', timestamp: getPastDate(2, 10, 32) },
+    { id: 'm4', sender: 'me', type: 'image', text: 'Here is the draft I mentioned.', imageUrl: 'https://placehold.co/400x300.png', timestamp: getPastDate(2, 15, 5), status: 'read' },
+
+    // Conversation from yesterday
+    { id: 'm5', sender: 'me', type: 'text', text: 'Following up on our chat. I\'m free now if you are.', timestamp: getPastDate(1, 14, 15), status: 'read' },
+    { id: 'm6', sender: 'contact', type: 'text', text: 'Perfect timing! I just got free as well. Let me call you in 5.', timestamp: getPastDate(1, 14, 20) },
+
+    // Conversation from today
+    { id: 'm7', sender: 'me', type: 'text', text: 'Great chat yesterday! I\'ve pushed the initial code to the repo.', timestamp: getPastDate(0, 9, 1), status: 'delivered' },
+    { id: 'm8', sender: 'contact', type: 'text', text: 'Awesome, I\'ll take a look now. Thanks!', timestamp: getPastDate(0, 9, 5) },
   ];
 
-  const specificMessages: Message[] = [];
-  for(let i=0; i<messageCount; i++) {
-      specificMessages.push({
-          id: `m${i+1}`,
-          sender: i % 2 === 0 ? 'contact' : 'me',
-          type: 'text',
-          text: i % 2 === 0 ? contactMessages[i % contactMessages.length] : userMessages[i % userMessages.length],
-          timestamp: `11:0${i} AM`,
-          status: i % 2 !== 0 ? 'read' : undefined
-      });
-  }
-
-  return specificMessages;
+  // Simple logic to vary messages based on contact ID, to make chats look different
+  const messageCount = 2 + (parseInt(contactId, 10) % (allMessages.length - 1));
+  return allMessages.slice(0, messageCount);
 };

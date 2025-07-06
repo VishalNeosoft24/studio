@@ -2,6 +2,7 @@
 
 import type { Message, Contact } from '@/types';
 import { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -16,8 +17,28 @@ import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import CameraViewDialog from './camera-view-dialog';
 import { getMockMessages } from '@/lib/mock-data';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+
 
 const EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', '🤔', '🔥', '😊', '😎', '💯'];
+
+const DateSeparator = ({ date }: { date: Date }) => {
+  let label = format(date, 'PPP'); // Fallback to full date format
+  if (isToday(date)) {
+    label = 'Today';
+  } else if (isYesterday(date)) {
+    label = 'Yesterday';
+  }
+
+  return (
+    <div className="flex justify-center my-2">
+      <div className="bg-secondary px-3 py-1 text-xs text-muted-foreground rounded-full shadow-sm">
+        {label}
+      </div>
+    </div>
+  );
+};
+
 
 interface ChatWindowProps {
   contact: Contact;
@@ -30,16 +51,17 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
   const [messages, setMessages] = useState<Message[]>(getMockMessages(contact.id));
   const [newMessage, setNewMessage] = useState('');
   const [imageToSend, setImageToSend] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
   
   const [isContactInfoOpen, setContactInfoOpen] = useState(false);
   const [isCameraOpen, setCameraOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-        (scrollAreaRef.current.firstChild as HTMLDivElement).scrollTop = scrollAreaRef.current.scrollHeight;
+    if (scrollViewportRef.current) {
+        scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -54,23 +76,23 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
 
     if (imageToSend) {
        const messageToSend: Message = {
-        id: `m${messages.length + 1}`,
+        id: `m${Date.now()}`,
         sender: 'me',
         type: 'image',
         text: newMessage, // Caption
         imageUrl: imageToSend,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date(),
         status: 'sent',
        };
        setMessages([...messages, messageToSend]);
        setImageToSend(null);
     } else {
        const messageToSend: Message = {
-        id: `m${messages.length + 1}`,
+        id: `m${Date.now()}`,
         sender: 'me',
         type: 'text',
         text: newMessage,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date(),
         status: 'sent',
        };
        setMessages([...messages, messageToSend]);
@@ -79,15 +101,17 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
     setNewMessage('');
     
     // Simulate receiving a reply
+    setIsTyping(true);
     setTimeout(() => {
         const reply: Message = {
-          id: `m${messages.length + 2}`,
+          id: `m${Date.now() + 1}`,
           sender: 'contact',
           type: 'text',
           text: 'Got it!',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date(),
         };
         setMessages(prev => [...prev, reply]);
+        setIsTyping(false);
     }, 1500);
   };
   
@@ -144,7 +168,7 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{contact.name} {contact.isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{contact.isBlocked ? 'Blocked' : contact.status === 'online' ? 'Online' : contact.status}</p>
+            <p className="text-xs text-muted-foreground">{contact.isBlocked ? 'Blocked' : isTyping ? 'typing...' : contact.status === 'online' ? 'Online' : contact.status}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -156,7 +180,7 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
                 <DropdownMenuItem onClick={() => setContactInfoOpen(true)}><Info className="mr-2 h-4 w-4" /><span>Contact info</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={toggleMute}>{contact.isMuted ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}<span>{contact.isMuted ? 'Unmute' : 'Mute'} notifications</span></DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { setMessages([]); showToast('Messages cleared'); }}><Trash2 className="mr-2 h-4 w-4" /><span>Clear messages</span></DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setMessages([]); toast({ title: 'Messages cleared' }); }}><Trash2 className="mr-2 h-4 w-4" /><span>Clear messages</span></DropdownMenuItem>
                 <DropdownMenuItem onClick={onCloseChat}><XCircle className="mr-2 h-4 w-4" /><span>Close chat</span></DropdownMenuItem>
                 <DropdownMenuItem className={contact.isBlocked ? '' : 'text-destructive'} onClick={toggleBlock}><Ban className="mr-2 h-4 w-4" /><span>{contact.isBlocked ? 'Unblock' : 'Block'}</span></DropdownMenuItem>
             </DropdownMenuContent>
@@ -165,24 +189,30 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
       </CardHeader>
 
       <CardContent className="flex-1 overflow-hidden p-0 relative">
-        <ScrollArea className="h-full" ref={scrollAreaRef}>
-           <div className="p-4 space-y-4">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`message-bubble ${msg.sender === 'me' ? 'message-bubble-outbound' : 'message-bubble-inbound'}`}>
-                  {msg.type === 'image' && msg.imageUrl && (
-                      <div className="relative w-64 h-64 mb-2">
-                        <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md"/>
-                      </div>
-                  )}
-                  {msg.text && <p className="text-sm">{msg.text}</p>}
-                  <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                      <span className="text-xs text-muted-foreground">{msg.timestamp}</span>
-                     {msg.sender === 'me' && getStatusIcon(msg.status)}
+        <ScrollArea className="h-full" viewportRef={scrollViewportRef}>
+           <div className="p-4 space-y-2">
+            {messages.map((msg, index) => {
+              const showDateSeparator = index === 0 || !isSameDay(messages[index - 1].timestamp, msg.timestamp);
+              
+              return (
+              <React.Fragment key={msg.id}>
+                {showDateSeparator && <DateSeparator date={msg.timestamp} />}
+                <div className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`message-bubble ${msg.sender === 'me' ? 'message-bubble-outbound' : 'message-bubble-inbound'}`}>
+                    {msg.type === 'image' && msg.imageUrl && (
+                        <div className="relative w-64 h-64 mb-2">
+                          <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md"/>
+                        </div>
+                    )}
+                    {msg.text && <p className="text-sm">{msg.text}</p>}
+                    <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+                        <span className="text-xs text-muted-foreground">{format(msg.timestamp, 'p')}</span>
+                       {msg.sender === 'me' && getStatusIcon(msg.status)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              </React.Fragment>
+            )})}
             </div>
         </ScrollArea>
         {imageToSend && (

@@ -17,6 +17,6 @@ export type Message = {
   type: 'text' | 'image';
   text: string;
   imageUrl?: string;
-  timestamp: string; // Consider using Date object
+  timestamp: Date; // Consider using Date object
   status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
 };
