@@ -18,9 +18,8 @@ import ContactInfoSheet from './contact-info-sheet';
 import CameraViewDialog from './camera-view-dialog';
 import { getMockMessages } from '@/lib/mock-data';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 
-
-const EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '😭', '🎉', '🤔', '🔥', '😊', '😎', '💯', '🙌', '😮', '😢', '🥰', '🤣', '🤩'];
 
 const DateSeparator = ({ date }: { date: Date }) => {
   let label = format(date, 'PPP'); // Fallback to full date format
@@ -171,6 +170,10 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
   
   const handleCapture = (dataUrl: string) => {
       setImageToSend(dataUrl);
+  };
+
+  const handleEmojiSelect = (emoji: EmojiClickData) => {
+    setNewMessage(prevInput => prevInput + emoji.emoji);
   };
   
   const toggleMute = () => {
@@ -333,16 +336,17 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
         <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
           <Popover>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                    <Smile className="h-5 w-5" /><span className="sr-only">Add emoji</span>
-                </Button>
+              <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                  <Smile className="h-5 w-5" /><span className="sr-only">Add emoji</span>
+              </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-2">
-                <div className="grid grid-cols-8 gap-1">
-                    {EMOJIS.map(emoji => (
-                        <button key={emoji} type="button" onClick={() => setNewMessage(newMessage + emoji)} className="text-2xl rounded-md p-1 hover:bg-secondary transition-colors">{emoji}</button>
-                    ))}
-                </div>
+            <PopoverContent className="w-auto p-0 border-0" side="top" align="start">
+              <Picker 
+                onEmojiClick={handleEmojiSelect}
+                autoFocusSearch={false}
+                emojiStyle={EmojiStyle.NATIVE}
+                theme="auto"
+              />
             </PopoverContent>
           </Popover>
           <DropdownMenu>
