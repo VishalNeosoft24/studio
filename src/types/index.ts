@@ -1,3 +1,11 @@
+export type User = {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl?: string;
+    about?: string;
+}
+
 export type Contact = {
   id: string;
   name: string;

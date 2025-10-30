@@ -1,6 +1,12 @@
 
-import type { Contact, Message } from '@/types';
+import type { Contact, Message, User } from '@/types';
 import { initialContacts, getMockMessages as getMockMessagesData } from './mock-data';
+
+// This would come from your database
+const mockUsers: User[] = [
+    { id: 'u1', name: 'Test User', email: 'test@example.com' },
+];
+
 
 // --- Configuration ---
 // For development, your Django server might be running on http://127.0.0.1:8000
@@ -49,6 +55,58 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 
 // --- API Functions ---
+
+/**
+ * Logs in a user.
+ * POST /auth/token/
+ */
+export async function login(email: string, password: string): Promise<User> {
+    console.log('Attempting to log in with:', { email, password });
+    // MOCK IMPLEMENTATION
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const user = mockUsers.find(u => u.email === email);
+    if (user) {
+        // In a real app, you'd check the password hash here
+        console.log('Login successful for user:', user);
+        return Promise.resolve(user);
+    } else {
+        console.log('Login failed: user not found');
+        return Promise.reject(new Error('Invalid credentials'));
+    }
+
+    // REAL IMPLEMENTATION
+    // const response = await apiFetch('/auth/token/', {
+    //     method: 'POST',
+    //     body: JSON.stringify({ email, password }),
+    // });
+    // return response as User; 
+}
+
+/**
+ * Registers a new user.
+ * POST /auth/register/
+ */
+export async function register(name: string, email: string, password: string): Promise<User> {
+    // MOCK IMPLEMENTATION
+    await new Promise(resolve => setTimeout(resolve, 500));
+    if (mockUsers.some(u => u.email === email)) {
+        return Promise.reject(new Error('Email already in use'));
+    }
+    const newUser: User = {
+        id: `u${mockUsers.length + 1}`,
+        name,
+        email,
+    };
+    mockUsers.push(newUser);
+    return Promise.resolve(newUser);
+    
+    // REAL IMPLEMENTATION
+    // const response = await apiFetch('/auth/register/', {
+    //     method: 'POST',
+    //     body: JSON.stringify({ name, email, password }),
+    // });
+    // return response as User;
+}
 
 /**
  * Fetches the list of contacts for the current user.
