@@ -16,8 +16,7 @@ import { register } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-    name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-    email: z.string().email({ message: 'Please enter a valid email.' }),
+    username: z.string().min(2, { message: 'Username must be at least 2 characters.' }),
     password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
 });
 
@@ -29,8 +28,7 @@ export default function RegisterPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      email: '',
+      username: '',
       password: '',
     },
   });
@@ -38,7 +36,7 @@ export default function RegisterPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-        const newUser = await register(values.name, values.email, values.password);
+        const newUser = await register(values.username, values.password);
         toast({
             title: 'Registration Successful',
             description: "You can now log in with your new account.",
@@ -48,7 +46,7 @@ export default function RegisterPage() {
         toast({
             variant: 'destructive',
             title: 'Registration Failed',
-            description: 'This email might already be taken. Please try again.',
+            description: 'This username might already be taken. Please try again.',
         });
     } finally {
         setIsLoading(false);
@@ -64,25 +62,12 @@ export default function RegisterPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
             control={form.control}
-            name="name"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>Username</FormLabel>
                 <FormControl>
-                  <Input placeholder="Your Name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="you@example.com" {...field} />
+                  <Input placeholder="your_username" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -116,4 +101,3 @@ export default function RegisterPage() {
     </AuthLayout>
   );
 }
-

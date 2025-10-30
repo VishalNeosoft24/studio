@@ -4,7 +4,7 @@ import { initialContacts, getMockMessages as getMockMessagesData } from './mock-
 
 // This would come from your database
 const mockUsers: User[] = [
-    { id: 'u1', name: 'Test User', email: 'test@example.com' },
+    { id: 'u1', name: 'Test User', username: 'testuser' },
 ];
 
 
@@ -60,11 +60,11 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
  * Logs in a user.
  * POST /auth/token/
  */
-export async function login(email: string, password: string): Promise<User> {
-    console.log('Attempting to log in with:', { email, password });
+export async function login(username: string, password: string): Promise<User> {
+    console.log('Attempting to log in with:', { username, password });
     // MOCK IMPLEMENTATION
     await new Promise(resolve => setTimeout(resolve, 500));
-    const user = mockUsers.find(u => u.email === email);
+    const user = mockUsers.find(u => u.username === username);
     if (user) {
         // In a real app, you'd check the password hash here
         console.log('Login successful for user:', user);
@@ -77,7 +77,7 @@ export async function login(email: string, password: string): Promise<User> {
     // REAL IMPLEMENTATION
     // const response = await apiFetch('/auth/token/', {
     //     method: 'POST',
-    //     body: JSON.stringify({ email, password }),
+    //     body: JSON.stringify({ username, password }),
     // });
     // return response as User; 
 }
@@ -86,16 +86,16 @@ export async function login(email: string, password: string): Promise<User> {
  * Registers a new user.
  * POST /auth/register/
  */
-export async function register(name: string, email: string, password: string): Promise<User> {
+export async function register(username: string, password: string): Promise<User> {
     // MOCK IMPLEMENTATION
     await new Promise(resolve => setTimeout(resolve, 500));
-    if (mockUsers.some(u => u.email === email)) {
-        return Promise.reject(new Error('Email already in use'));
+    if (mockUsers.some(u => u.username === username)) {
+        return Promise.reject(new Error('Username already in use'));
     }
     const newUser: User = {
         id: `u${mockUsers.length + 1}`,
-        name,
-        email,
+        name: username, // Using username as the name for now
+        username: username,
     };
     mockUsers.push(newUser);
     return Promise.resolve(newUser);
@@ -103,7 +103,7 @@ export async function register(name: string, email: string, password: string): P
     // REAL IMPLEMENTATION
     // const response = await apiFetch('/auth/register/', {
     //     method: 'POST',
-    //     body: JSON.stringify({ name, email, password }),
+    //     body: JSON.stringify({ username, password }),
     // });
     // return response as User;
 }

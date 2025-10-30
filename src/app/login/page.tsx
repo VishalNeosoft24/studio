@@ -16,7 +16,7 @@ import { login } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email.' }),
+  username: z.string().min(1, { message: 'Username is required.' }),
   password: z.string().min(1, { message: 'Password is required.' }),
 });
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: '',
+      username: '',
       password: '',
     },
   });
@@ -37,7 +37,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       // In a real app, you'd get a JWT token back
-      const user = await login(values.email, values.password); 
+      const user = await login(values.username, values.password); 
       
       toast({
         title: 'Login Successful',
@@ -51,7 +51,7 @@ export default function LoginPage() {
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: 'Invalid email or password. Please try again.',
+        description: 'Invalid username or password. Please try again.',
       });
     } finally {
         setIsLoading(false);
@@ -67,12 +67,12 @@ export default function LoginPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
             control={form.control}
-            name="email"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Username</FormLabel>
                 <FormControl>
-                  <Input placeholder="you@example.com" {...field} />
+                  <Input placeholder="your_username" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
