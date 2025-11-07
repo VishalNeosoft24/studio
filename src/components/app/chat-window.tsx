@@ -105,11 +105,10 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         };
 
         // Optimistically update to the new value
-        if (previousMessages) {
-            queryClient.setQueryData<Message[]>(['messages', chat.id], [...previousMessages, optimisticMessage]);
-        } else {
-            queryClient.setQueryData<Message[]>(['messages', chat.id], [optimisticMessage]);
-        }
+        queryClient.setQueryData<Message[]>(
+          ['messages', chat.id],
+          (old = []) => [...old, optimisticMessage]
+        );
 
         return { previousMessages };
     },
