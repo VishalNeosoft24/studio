@@ -36,27 +36,27 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // In a real app, you'd get a JWT token back
-      const user = await login(values.username, values.password); 
-      
+    const tokens = await login(values.username, values.password);
+
       toast({
         title: 'Login Successful',
-        description: `Welcome back, ${user.name}!`,
+        description: `Welcome back, ${values.username}!`,
       });
-      
-      // Store the token and redirect
-      router.push('/chat');
 
-    } catch (error) {
+      // Optionally, you could decode token or fetch user profile next
+      router.push('/chat');
+    } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: 'Invalid username or password. Please try again.',
+        description:
+          error.message || 'Invalid username or password. Please try again.',
       });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-  }
+}
 
   return (
     <AuthLayout
