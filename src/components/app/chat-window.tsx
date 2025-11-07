@@ -67,21 +67,23 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<Message[]>({
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
       queryKey: ['messages', chat.id],
-      queryFn: async () => {
-        const apiMessages = await getMessages(chat.id);
-        // Transform API messages to UI messages right after fetching
+      queryFn: () => getMessages(chat.id),
+      // This `select` option transforms the data right after fetching.
+      // It ensures the component only ever sees data with valid Date objects.
+      select: (apiMessages: ApiMessage[]) => {
         return apiMessages.map(msg => ({
             id: msg.id.toString(),
             sender: msg.sender.id === currentUserId ? 'me' : 'contact',
             type: 'text',
             text: msg.content,
-            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+            timestamp: new Date(msg.timestamp), // Convert string to Date
             status: msg.sender.id === currentUserId ? 'read' : undefined,
-        }));
+        } as Message));
       },
-      staleTime: 1000 * 60, // 1 minute
+      refetchInterval: 3000, // Refetch messages every 3 seconds
+      staleTime: 3000, // Consider data fresh for 3 seconds
   });
   
   const sendMessageMutation = useMutation({
@@ -130,9 +132,14 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   useEffect(() => {
     if (scrollViewportRef.current) {
-        scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
+        // A small delay helps ensure the DOM has updated before scrolling
+        setTimeout(() => {
+            if (scrollViewportRef.current) {
+                scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
+            }
+        }, 100);
     }
-  }, [messages]);
+  }, [messages, chat.id]);
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
@@ -290,12 +297,18 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       <CardContent className="flex-1 overflow-hidden p-0 relative">
         <ScrollArea className="h-full" viewportRef={scrollViewportRef}>
            <div className="p-4 space-y-2">
-            {isLoadingMessages && (
+            {isLoadingMessages && messages.length === 0 && (
                  <div className="flex justify-center items-center h-full">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                  </div>
             )}
-            {!isLoadingMessages && messages.map((msg, index) => {
+            {messages.map((msg, index) => {
+              // This check is crucial. It ensures we don't try to format an invalid date.
+              if (!msg.timestamp || isNaN(msg.timestamp.getTime())) {
+                console.error("Invalid message timestamp detected:", msg);
+                return null;
+              }
+              
               const showDateSeparator = index === 0 || !isSameDay(messages[index - 1].timestamp, msg.timestamp);
               
               return (
@@ -378,9 +391,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                     {msg.text && <p className="text-sm">{msg.text}</p>}
                     <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-xs text-muted-foreground">
-                        {msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
-                          ? format(new Date(msg.timestamp), 'p')
-                          : ''}
+                        {format(msg.timestamp, 'p')}
                       </span>
                        {msg.sender === 'me' && getStatusIcon(msg.status)}
                     </div>
