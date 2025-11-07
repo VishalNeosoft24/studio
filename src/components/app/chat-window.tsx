@@ -82,7 +82,6 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         }));
       },
       staleTime: 1000 * 60, // 1 minute
-      refetchInterval: 5000, // Refetch every 5 seconds
   });
   
   const sendMessageMutation = useMutation({
