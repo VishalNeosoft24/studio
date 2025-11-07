@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Message, Chat, Participant, ApiMessage } from '@/types';
+import type { Message, Chat, ApiMessage } from '@/types';
 import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import Image from 'next/image';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus, Timer, Wallpaper, Download, SquarePlus, Loader2 } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus, Timer, Wallpaper, Download, SquarePlus, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMessages, sendMessage, getCurrentUserId } from '@/lib/api';
+import { useWebSocket } from '@/hooks/use-web-socket';
 
 
 const DateSeparator = ({ date }: { date: Date }) => {
@@ -67,25 +68,43 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
+  const transformApiMessage = (msg: ApiMessage): Message => ({
+    id: msg.id.toString(),
+    sender: msg.sender.id === currentUserId ? 'me' : 'contact',
+    type: 'text', // This would need to be dynamic if you support more types
+    text: msg.content,
+    timestamp: new Date(msg.timestamp),
+    status: msg.sender.id === currentUserId ? 'read' : undefined,
+  });
+
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
-      // This `select` option transforms the data right after fetching.
-      // It ensures the component only ever sees data with valid Date objects.
-      select: (apiMessages: ApiMessage[]) => {
-        return apiMessages.map(msg => ({
-            id: msg.id.toString(),
-            sender: msg.sender.id === currentUserId ? 'me' : 'contact',
-            type: 'text',
-            text: msg.content,
-            timestamp: new Date(msg.timestamp), // Convert string to Date
-            status: msg.sender.id === currentUserId ? 'read' : undefined,
-        } as Message));
-      },
-      refetchInterval: 3000, // Refetch messages every 3 seconds
-      staleTime: 3000, // Consider data fresh for 3 seconds
+      select: (apiMessages) => apiMessages.map(transformApiMessage),
+      staleTime: 5000, // Keep data fresh for 5 seconds
   });
   
+  // WebSocket connection for real-time messages
+  useWebSocket(chat.id, (messageEvent) => {
+    try {
+      const newApiMessage = JSON.parse(messageEvent.data) as ApiMessage;
+      // You might want to add a check here to ensure the message belongs to this chat
+      // e.g., if (newApiMessage.chatId === chat.id)
+      const newUiMessage = transformApiMessage(newApiMessage);
+
+      queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
+        // Avoid adding duplicate messages
+        if (oldMessages.some(m => m.id === newUiMessage.id)) {
+          return oldMessages;
+        }
+        return [...oldMessages, newUiMessage];
+      });
+    } catch (e) {
+      console.error("Failed to parse incoming WebSocket message", e);
+    }
+  });
+
+
   const sendMessageMutation = useMutation({
     mutationFn: (content: string) => sendMessage(chat.id, content, 'text'),
     onMutate: async (newContent: string) => {
@@ -95,13 +114,13 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         // Snapshot the previous value
         const previousMessages = queryClient.getQueryData<Message[]>(['messages', chat.id]);
 
-        // Create the new optimistic message with a valid Date object
+        // Create the new optimistic message
         const optimisticMessage: Message = {
             id: `temp-${Date.now()}`,
             sender: 'me',
             type: 'text',
             text: newContent,
-            timestamp: new Date(), // Use a real Date object here
+            timestamp: new Date(),
             status: 'sent',
         };
 
@@ -124,9 +143,18 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             description: "Something went wrong.",
         });
     },
+    onSuccess: (sentMessage) => {
+        // The message was successfully sent to the API. The WebSocket will deliver the final version.
+        // We can invalidate to be safe, or just rely on the WS.
+        // Let's remove the optimistic message and wait for the WS version.
+        queryClient.setQueryData<Message[]>(['messages', chat.id], (old) =>
+          old?.filter(m => !m.id.startsWith('temp-'))
+        );
+        // The WebSocket listener will add the message from the backend broadcast
+    },
     onSettled: () => {
-        // Invalidate and refetch after the mutation is settled to get the real message from the server
-        queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
+        // Invalidate eventually to ensure consistency
+        // queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
     },
   });
 
@@ -303,7 +331,6 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                  </div>
             )}
             {messages.map((msg, index) => {
-              // This check is crucial. It ensures we don't try to format an invalid date.
               if (!msg.timestamp || isNaN(msg.timestamp.getTime())) {
                 console.error("Invalid message timestamp detected:", msg);
                 return null;
@@ -476,3 +503,5 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     </>
   );
 }
+
+    
