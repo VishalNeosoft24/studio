@@ -67,9 +67,20 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-  const { data: apiMessages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[]>({
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<Message[]>({
       queryKey: ['messages', chat.id],
-      queryFn: () => getMessages(chat.id),
+      queryFn: async () => {
+        const apiMessages = await getMessages(chat.id);
+        // Transform API messages to UI messages right after fetching
+        return apiMessages.map(msg => ({
+            id: msg.id.toString(),
+            sender: msg.sender.id === currentUserId ? 'me' : 'contact',
+            type: 'text',
+            text: msg.content,
+            timestamp: new Date(msg.timestamp),
+            status: msg.sender.id === currentUserId ? 'read' : undefined,
+        }));
+      },
       staleTime: 1000 * 60, // 1 minute
       refetchInterval: 5000, // Refetch every 5 seconds
   });
@@ -77,35 +88,27 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const sendMessageMutation = useMutation({
     mutationFn: (content: string) => sendMessage(chat.id, content, 'text'),
     onMutate: async (newContent: string) => {
-        // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+        // Cancel any outgoing refetches so they don't overwrite our optimistic update
         await queryClient.cancelQueries({ queryKey: ['messages', chat.id] });
 
         // Snapshot the previous value
-        const previousMessages = queryClient.getQueryData<ApiMessage[]>(['messages', chat.id]);
+        const previousMessages = queryClient.getQueryData<Message[]>(['messages', chat.id]);
+
+        // Create the new optimistic message with a valid Date object
+        const optimisticMessage: Message = {
+            id: `temp-${Date.now()}`,
+            sender: 'me',
+            type: 'text',
+            text: newContent,
+            timestamp: new Date(), // Use a real Date object here
+            status: 'sent',
+        };
 
         // Optimistically update to the new value
         if (previousMessages) {
-            const tempId = `temp-${Date.now()}`;
-            const optimisticMessage: Message = {
-                id: tempId,
-                sender: 'me',
-                type: 'text',
-                text: newContent,
-                timestamp: new Date(), // Use a real Date object here
-                status: 'sent',
-            };
-
-            // We need to transform the previous API messages to the UI format
-            const previousUiMessages: Message[] = previousMessages.map(msg => ({
-                id: msg.id.toString(),
-                sender: msg.sender.id === currentUserId ? 'me' : 'contact',
-                type: 'text',
-                text: msg.content,
-                timestamp: new Date(msg.timestamp),
-                status: msg.sender.id === currentUserId ? 'read' : undefined,
-            }));
-
-            queryClient.setQueryData(['messages', chat.id, 'ui'], [...previousUiMessages, optimisticMessage]);
+            queryClient.setQueryData<Message[]>(['messages', chat.id], [...previousMessages, optimisticMessage]);
+        } else {
+            queryClient.setQueryData<Message[]>(['messages', chat.id], [optimisticMessage]);
         }
 
         return { previousMessages };
@@ -122,21 +125,10 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         });
     },
     onSettled: () => {
-        // Invalidate and refetch after the mutation is settled
+        // Invalidate and refetch after the mutation is settled to get the real message from the server
         queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
     },
   });
-
-  // Check for the optimistic UI data first, then fall back to the transformed API data
-  const messages: Message[] = queryClient.getQueryData<Message[]>(['messages', chat.id, 'ui']) || apiMessages.map(msg => ({
-    id: msg.id.toString(),
-    sender: msg.sender.id === currentUserId ? 'me' : 'contact',
-    type: 'text',
-    text: msg.content,
-    timestamp: new Date(msg.timestamp),
-    status: msg.sender.id === currentUserId ? 'read' : undefined, // Mock status
-  }));
-
 
   useEffect(() => {
     if (scrollViewportRef.current) {
