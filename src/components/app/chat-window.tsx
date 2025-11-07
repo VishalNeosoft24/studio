@@ -77,7 +77,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             sender: msg.sender.id === currentUserId ? 'me' : 'contact',
             type: 'text',
             text: msg.content,
-            timestamp: new Date(msg.timestamp),
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
             status: msg.sender.id === currentUserId ? 'read' : undefined,
         }));
       },
@@ -377,7 +377,11 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                       )}
                     {msg.text && <p className="text-sm">{msg.text}</p>}
                     <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                        <span className="text-xs text-muted-foreground">{format(msg.timestamp, 'p')}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+                          ? format(new Date(msg.timestamp), 'p')
+                          : ''}
+                      </span>
                        {msg.sender === 'me' && getStatusIcon(msg.status)}
                     </div>
                   </div>
