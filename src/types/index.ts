@@ -1,4 +1,5 @@
 
+
 export type User = {
     id: string;
     name: string;
@@ -7,18 +8,19 @@ export type User = {
     about?: string;
 }
 
-export type Contact = {
-  id: string;
-  name: string;
-  avatarUrl: string;
-  lastMessage: string;
-  lastMessageTimestamp: string;
-  status: 'online' | string; // Can be 'online' or a 'last seen at...' string
-  unreadCount?: number;
-  isMuted?: boolean;
-  isBlocked?: boolean;
-  about?: string;
-};
+export type Participant = {
+    id: number;
+    username: string;
+    profile_picture_url: string | null;
+}
+
+export type Chat = {
+    id: string;
+    name: string;
+    chat_type: 'private' | 'group';
+    participants: Participant[];
+    created_at: string;
+}
 
 export type Message = {
   id: string;

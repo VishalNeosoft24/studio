@@ -1,6 +1,7 @@
+
 'use client';
 
-import type { Message, Contact } from '@/types';
+import type { Message, Chat, Participant } from '@/types';
 import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import Image from 'next/image';
@@ -40,14 +41,17 @@ const DateSeparator = ({ date }: { date: Date }) => {
 
 
 interface ChatWindowProps {
-  contact: Contact;
-  onContactUpdate: (contact: Contact) => void;
+  chat: Chat;
   onCloseChat: () => void;
 }
 
-export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: ChatWindowProps) {
+// A (very) simple mock to get the current user ID. 
+// In a real app, this would come from a global state/context after login.
+const MOCK_CURRENT_USER_ID = 3;
+
+export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>(getMockMessages(contact.id));
+  const [messages, setMessages] = useState<Message[]>(getMockMessages(chat.id));
   const [newMessage, setNewMessage] = useState('');
   const [imageToSend, setImageToSend] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -56,9 +60,16 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
   const [isCameraOpen, setCameraOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // States for mute and block to make them interactive
+  const [isMuted, setIsMuted] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
+  
+  const otherParticipant = chat.participants.find(p => p.id !== MOCK_CURRENT_USER_ID) || chat.participants[0];
+
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -219,15 +230,13 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
   };
   
   const toggleMute = () => {
-      const updatedContact = { ...contact, isMuted: !contact.isMuted };
-      onContactUpdate(updatedContact);
-      toast({ title: updatedContact.isMuted ? `Notifications muted for ${contact.name}` : `Notifications unmuted for ${contact.name}` });
+      setIsMuted(!isMuted);
+      toast({ title: !isMuted ? `Notifications muted for ${chat.name}` : `Notifications unmuted for ${chat.name}` });
   }
 
   const toggleBlock = () => {
-      const updatedContact = { ...contact, isBlocked: !contact.isBlocked };
-      onContactUpdate(updatedContact);
-      toast({ title: updatedContact.isBlocked ? `${contact.name} has been blocked` : `${contact.name} has been unblocked`, variant: updatedContact.isBlocked ? 'destructive' : 'default' });
+      setIsBlocked(!isBlocked);
+      toast({ title: !isBlocked ? `${chat.name} has been blocked` : `${chat.name} has been unblocked`, variant: !isBlocked ? 'destructive' : 'default' });
   }
 
   const getStatusIcon = (status?: 'sent' | 'delivered' | 'read') => {
@@ -241,7 +250,7 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
 
   return (
     <>
-    <ContactInfoSheet contact={contact} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
+    <ContactInfoSheet participant={otherParticipant} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
     <CameraViewDialog open={isCameraOpen} onOpenChange={setCameraOpen} onCapture={handleCapture} />
 
     <Card className="flex flex-col h-full w-full rounded-none border-none shadow-none bg-transparent">
@@ -262,15 +271,12 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
         <>
         <div className="flex items-center">
            <Avatar className="h-10 w-10 mr-3 relative cursor-pointer" onClick={() => setContactInfoOpen(true)}>
-            <AvatarImage src={contact.avatarUrl} alt={contact.name} />
-            <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-             {contact.status === 'online' && !contact.isBlocked && (
-                 <Circle className="absolute bottom-0 right-0 h-3 w-3 fill-accent stroke-accent border-2 border-background rounded-full" />
-              )}
+            <AvatarImage src={otherParticipant.profile_picture_url || ''} alt={otherParticipant.username} />
+            <AvatarFallback>{otherParticipant.username.charAt(0)}</AvatarFallback>
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
-            <h2 className="font-semibold flex items-center">{contact.name} {contact.isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{contact.isBlocked ? 'Blocked' : isTyping ? 'typing...' : contact.status === 'online' ? 'Online' : contact.status}</p>
+            <h2 className="font-semibold flex items-center">{chat.name} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
+            <p className="text-xs text-muted-foreground">{isBlocked ? 'Blocked' : isTyping ? 'typing...' : 'Online'}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -284,8 +290,8 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
                     <span>Contact info</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={toggleMute}>
-                    {contact.isMuted ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}
-                    <span>{contact.isMuted ? 'Unmute' : 'Mute'} notifications</span>
+                    {isMuted ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}
+                    <span>{isMuted ? 'Unmute' : 'Mute'} notifications</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => showToast('Disappearing messages', 'This feature is not yet implemented.')}>
                     <Timer className="mr-2 h-4 w-4" />
@@ -305,9 +311,9 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             <span>Report</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className={contact.isBlocked ? '' : 'text-destructive'} onClick={toggleBlock}>
+                        <DropdownMenuItem className={isBlocked ? '' : 'text-destructive'} onClick={toggleBlock}>
                             <Ban className="mr-2 h-4 w-4" />
-                            <span>{contact.isBlocked ? 'Unblock' : 'Block'}</span>
+                            <span>{isBlocked ? 'Unblock' : 'Block'}</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setMessages([]); toast({ title: 'Chat cleared' }); }}>
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -435,7 +441,7 @@ export default function ChatWindow({ contact, onContactUpdate, onCloseChat }: Ch
         )}
       </CardContent>
 
-      {contact.isBlocked ? (
+      {isBlocked ? (
         <CardFooter className="p-3 border-t bg-secondary">
           <Alert variant="destructive" className="w-full">
             <AlertTriangle className="h-4 w-4" />
