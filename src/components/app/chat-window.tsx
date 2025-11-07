@@ -76,23 +76,62 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   
   const sendMessageMutation = useMutation({
     mutationFn: (content: string) => sendMessage(chat.id, content, 'text'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
+    onMutate: async (newContent: string) => {
+        // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+        await queryClient.cancelQueries({ queryKey: ['messages', chat.id] });
+
+        // Snapshot the previous value
+        const previousMessages = queryClient.getQueryData<ApiMessage[]>(['messages', chat.id]);
+
+        // Optimistically update to the new value
+        if (previousMessages) {
+            const tempId = `temp-${Date.now()}`;
+            const optimisticMessage: Message = {
+                id: tempId,
+                sender: 'me',
+                type: 'text',
+                text: newContent,
+                timestamp: new Date(), // Use a real Date object here
+                status: 'sent',
+            };
+
+            // We need to transform the previous API messages to the UI format
+            const previousUiMessages: Message[] = previousMessages.map(msg => ({
+                id: msg.id.toString(),
+                sender: msg.sender.id === currentUserId ? 'me' : 'contact',
+                type: 'text',
+                text: msg.content,
+                timestamp: new Date(msg.timestamp),
+                status: msg.sender.id === currentUserId ? 'read' : undefined,
+            }));
+
+            queryClient.setQueryData(['messages', chat.id, 'ui'], [...previousUiMessages, optimisticMessage]);
+        }
+
+        return { previousMessages };
     },
-    onError: (error) => {
+    onError: (err, newContent, context) => {
+        // Rollback to the previous value on error
+        if (context?.previousMessages) {
+            queryClient.setQueryData(['messages', chat.id], context.previousMessages);
+        }
         toast({
             variant: 'destructive',
             title: 'Failed to send message',
-            description: error.message,
+            description: "Something went wrong.",
         });
-    }
+    },
+    onSettled: () => {
+        // Invalidate and refetch after the mutation is settled
+        queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
+    },
   });
 
-  // Transform API messages to UI message format
-  const messages: Message[] = apiMessages.map(msg => ({
+  // Check for the optimistic UI data first, then fall back to the transformed API data
+  const messages: Message[] = queryClient.getQueryData<Message[]>(['messages', chat.id, 'ui']) || apiMessages.map(msg => ({
     id: msg.id.toString(),
     sender: msg.sender.id === currentUserId ? 'me' : 'contact',
-    type: 'text', // Assuming text for now based on API
+    type: 'text',
     text: msg.content,
     timestamp: new Date(msg.timestamp),
     status: msg.sender.id === currentUserId ? 'read' : undefined, // Mock status
