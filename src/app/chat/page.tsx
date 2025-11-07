@@ -8,7 +8,7 @@ import ChatWindow from '@/components/app/chat-window';
 import ChatPlaceholder from '@/components/app/chat-placeholder';
 import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
-import { getChats, getMessages } from '@/lib/api';
+import { getChats } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 
 

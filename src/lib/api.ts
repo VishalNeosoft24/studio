@@ -1,5 +1,5 @@
 
-import type { Message, User, Chat } from '@/types';
+import type { User, Chat, ApiMessage } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -9,6 +9,20 @@ function getToken(): string | null {
     return localStorage.getItem('access_token');
   }
   return null;
+}
+
+// 👤 Get current user ID from token
+export function getCurrentUserId(): number | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    // The user ID is in the 'user_id' field in the JWT payload
+    return parseInt(payload.user_id, 10);
+  } catch (error) {
+    console.error("Failed to parse token:", error);
+    return null;
+  }
 }
 
 // 🌐 Common fetch wrapper
@@ -25,7 +39,6 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    const errorData = await response.text();
     // Special handling for 401 Unauthorized to redirect to login
     if (response.status === 401 && typeof window !== 'undefined') {
        console.error("Unauthorized request, redirecting to login.");
@@ -33,29 +46,28 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
        localStorage.removeItem('refresh_token');
        window.location.href = '/login';
     }
-    throw new Error(`API Error (${response.status}): ${errorData}`);
+    const errorData = await response.json().catch(() => ({ detail: 'An unknown API error occurred.' }));
+    throw new Error(errorData.detail || `API Error (${response.status})`);
   }
 
-  // Try to parse JSON safely, return text for empty responses
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
+  // Handle empty response bodies for methods like POST/DELETE
+  if (response.status === 204 || response.headers.get('Content-Length') === '0') {
+      return null;
   }
+
+  return response.json();
 }
 
 
 export async function getChats(): Promise<Chat[]> {
-  const data = await apiFetch("/chats/");
-  return data;
+  return await apiFetch("/chats/");
 }
 
 
 /**
  * 💬 Fetch messages for a chat
  */
-export async function getMessages(chatId: string): Promise<Message[]> {
+export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
@@ -64,51 +76,66 @@ export async function getMessages(chatId: string): Promise<Message[]> {
  */
 export async function sendMessage(
   chatId: string,
-  message: Omit<Message, 'id' | 'timestamp' | 'status'>
-): Promise<Message> {
+  content: string,
+  message_type: 'text' | 'image' // Add other types as needed
+): Promise<ApiMessage> {
   return await apiFetch(`/chats/${chatId}/messages/`, {
     method: 'POST',
-    body: JSON.stringify(message),
+    body: JSON.stringify({ content, message_type }),
   });
 }
 
 
 
 export async function login(username: string, password: string) {
-console.log('Attempting login for:', username);
+    console.log('Attempting login for:', username);
+    
+    const response = await fetch(`${API_BASE_URL}/auth/token/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+    });
 
-const response = await apiFetch('/auth/token/', {
-method: 'POST',
-body: JSON.stringify({ username, password }),
-});
+    const data = await response.json();
 
-// Expecting JWT response from DRF SimpleJWT
-if (response.access && response.refresh) {
-localStorage.setItem('access_token', response.access);
-localStorage.setItem('refresh_token', response.refresh);
-console.log('Login successful, tokens saved.');
-return response; // ✅ Return tokens so frontend knows login succeeded
+    if (!response.ok) {
+        throw new Error(data.detail || 'Login failed');
+    }
+
+    if (data.access && data.refresh) {
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
+        console.log('Login successful, tokens saved.');
+        return data;
+    }
+
+    throw new Error('Invalid login response (missing tokens)');
 }
 
-throw new Error('Invalid login response (missing tokens)');
-}
 
 /** 🆕 Register a new user */
 export async function register(username: string, password: string): Promise<User> {
-console.log('Registering user:', username);
+    console.log('Registering user:', username);
 
-const data = await apiFetch('/auth/register/', {
-method: 'POST',
-body: JSON.stringify({ username, password }),
-});
+    const response = await fetch(`${API_BASE_URL}/auth/register/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+        // Extract error message from Django REST Framework response
+        const errorMsg = data.username?.[0] || data.password?.[0] || 'Registration failed.';
+        throw new Error(errorMsg);
+    }
+    
+    if (data && data.username) {
+        console.log('Registration successful, auto logging in...');
+        await login(username, password);
+        return data as User;
+    }
 
-if (data && data.username) {
-console.log('Registration successful, auto logging in...');
-// After successful registration, log the user in to get tokens
-const tokens = await login(username, password);
-// The register function needs to return a user object as per its signature
-return { ...data, ...tokens };
-}
-
-throw new Error('Registration failed (unexpected response)');
+    throw new Error('Registration failed (unexpected response)');
 }

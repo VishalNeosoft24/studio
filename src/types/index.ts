@@ -1,8 +1,8 @@
 
 
+// For the UI, simplified
 export type User = {
     id: string;
-    name: string;
     username: string;
     avatarUrl?: string;
     about?: string;
@@ -22,6 +22,17 @@ export type Chat = {
     created_at: string;
 }
 
+// Represents the raw message from your DRF API
+export type ApiMessage = {
+    id: number;
+    sender: Participant;
+    content: string;
+    message_type: 'text' | 'image' | 'file'; // As defined by your backend
+    timestamp: string; // ISO 8601 date string
+};
+
+
+// Represents a message transformed for the UI
 export type Message = {
   id: string;
   sender: 'me' | 'contact'; // Simplified for UI purposes
@@ -34,6 +45,6 @@ export type Message = {
   audio?: { name: string, duration: string };
   location?: { address: string };
   event?: { title: string, dateTime: Date };
-  timestamp: Date; // Consider using Date object
+  timestamp: Date; // Date object for easier formatting
   status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
 };

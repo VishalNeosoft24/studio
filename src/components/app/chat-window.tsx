@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Message, Chat, Participant } from '@/types';
+import type { Message, Chat, Participant, ApiMessage } from '@/types';
 import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import Image from 'next/image';
@@ -11,15 +11,16 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus, Timer, Wallpaper, Download, SquarePlus } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, Circle, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus, Timer, Wallpaper, Download, SquarePlus, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import CameraViewDialog from './camera-view-dialog';
-import { getMockMessages } from '@/lib/mock-data';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getMessages, sendMessage, getCurrentUserId } from '@/lib/api';
 
 
 const DateSeparator = ({ date }: { date: Date }) => {
@@ -45,13 +46,9 @@ interface ChatWindowProps {
   onCloseChat: () => void;
 }
 
-// A (very) simple mock to get the current user ID. 
-// In a real app, this would come from a global state/context after login.
-const MOCK_CURRENT_USER_ID = 3;
-
 export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>(getMockMessages(chat.id));
+  const queryClient = useQueryClient();
   const [newMessage, setNewMessage] = useState('');
   const [imageToSend, setImageToSend] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -61,14 +58,45 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // States for mute and block to make them interactive
   const [isMuted, setIsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
-  const otherParticipant = chat.participants.find(p => p.id !== MOCK_CURRENT_USER_ID) || chat.participants[0];
+  const currentUserId = getCurrentUserId();
+  const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
+
+  const { data: apiMessages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[]>({
+      queryKey: ['messages', chat.id],
+      queryFn: () => getMessages(chat.id),
+      staleTime: 1000 * 60, // 1 minute
+      refetchInterval: 5000, // Refetch every 5 seconds
+  });
+  
+  const sendMessageMutation = useMutation({
+    mutationFn: (content: string) => sendMessage(chat.id, content, 'text'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
+    },
+    onError: (error) => {
+        toast({
+            variant: 'destructive',
+            title: 'Failed to send message',
+            description: error.message,
+        });
+    }
+  });
+
+  // Transform API messages to UI message format
+  const messages: Message[] = apiMessages.map(msg => ({
+    id: msg.id.toString(),
+    sender: msg.sender.id === currentUserId ? 'me' : 'contact',
+    type: 'text', // Assuming text for now based on API
+    text: msg.content,
+    timestamp: new Date(msg.timestamp),
+    status: msg.sender.id === currentUserId ? 'read' : undefined, // Mock status
+  }));
 
 
   useEffect(() => {
@@ -83,47 +111,9 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim() === '' && !imageToSend) return;
-
-    let messageToSend: Message;
-
-    if (imageToSend) {
-       messageToSend = {
-        id: `m${Date.now()}`,
-        sender: 'me',
-        type: 'image',
-        text: newMessage, // Caption
-        imageUrl: imageToSend,
-        timestamp: new Date(),
-        status: 'sent',
-       };
-       setImageToSend(null);
-    } else {
-       messageToSend = {
-        id: `m${Date.now()}`,
-        sender: 'me',
-        type: 'text',
-        text: newMessage,
-        timestamp: new Date(),
-        status: 'sent',
-       };
-    }
-    
-    setMessages(prev => [...prev, messageToSend]);
+    if (newMessage.trim() === '') return;
+    sendMessageMutation.mutate(newMessage);
     setNewMessage('');
-    
-    setIsTyping(true);
-    setTimeout(() => {
-        const reply: Message = {
-          id: `m${Date.now() + 1}`,
-          sender: 'contact',
-          type: 'text',
-          text: 'Got it!',
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, reply]);
-        setIsTyping(false);
-    }, 1500);
   };
   
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,98 +121,30 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       if (file) {
           const reader = new FileReader();
           reader.onload = (event) => {
+              // This is still mock. To implement fully, you'd upload the file
+              // then send the URL in a message.
               setImageToSend(event.target?.result as string);
           };
           reader.readAsDataURL(file);
       }
   };
   
-  const handleSendDocument = () => {
-    const messageToSend: Message = {
-      id: `m${Date.now()}`,
-      sender: 'me',
-      type: 'document',
-      text: 'Project Briefing',
-      document: { name: 'project-brief.pdf', size: '1.2 MB' },
-      timestamp: new Date(),
-      status: 'sent',
-    };
-    setMessages(prev => [...prev, messageToSend]);
-    toast({ title: 'Document sent' });
+  const sendMockMessage = (type: Message['type'], data: Partial<Message>) => {
+      showToast(`Sending ${type}...`, 'This part is not connected to the backend yet.');
+      // This is a placeholder to demonstrate UI.
+      // To implement, you would need backend support for each message type.
   };
   
-  const handleShareContact = () => {
-    const messageToSend: Message = {
-      id: `m${Date.now()}`,
-      sender: 'me',
-      type: 'contact',
-      text: '',
-      contactInfo: { name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50' },
-      timestamp: new Date(),
-      status: 'sent',
-    };
-    setMessages(prev => [...prev, messageToSend]);
-    toast({ title: 'Contact shared' });
-  };
-  
-  const handleSendPoll = () => {
-    const messageToSend: Message = {
-      id: `m${Date.now()}`,
-      sender: 'me',
-      type: 'poll',
-      text: '',
-      poll: { question: 'Where should we go for lunch?', options: ['Italian Place', 'Sushi Bar', 'Taco Truck'] },
-      timestamp: new Date(),
-      status: 'sent',
-    };
-    setMessages(prev => [...prev, messageToSend]);
-    toast({ title: 'Poll created' });
-  };
+  const handleSendDocument = () => sendMockMessage('document', { document: { name: 'project-brief.pdf', size: '1.2 MB' }});
+  const handleShareContact = () => sendMockMessage('contact', { contactInfo: { name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50' }});
+  const handleSendPoll = () => sendMockMessage('poll', { poll: { question: 'Where for lunch?', options: ['Italian', 'Sushi'] }});
+  const handleSendAudio = () => sendMockMessage('audio', { audio: { name: 'voice.mp3', duration: '0:34' }});
+  const handleSendLocation = () => sendMockMessage('location', { location: { address: '123 Main St' }});
+  const handleSendEvent = () => sendMockMessage('event', { event: { title: 'Team Meeting', dateTime: new Date() }});
 
-  const handleSendAudio = () => {
-    const messageToSend: Message = {
-      id: `m${Date.now()}`,
-      sender: 'me',
-      type: 'audio',
-      text: '',
-      audio: { name: 'voice-message.mp3', duration: '0:34' },
-      timestamp: new Date(),
-      status: 'sent',
-    };
-    setMessages(prev => [...prev, messageToSend]);
-    toast({ title: 'Audio message sent' });
-  };
-
-  const handleSendLocation = () => {
-    const messageToSend: Message = {
-      id: `m${Date.now()}`,
-      sender: 'me',
-      type: 'location',
-      text: '',
-      location: { address: '123 Main Street, Anytown, USA' },
-      timestamp: new Date(),
-      status: 'sent',
-    };
-    setMessages(prev => [...prev, messageToSend]);
-    toast({ title: 'Location shared' });
-  };
-
-  const handleSendEvent = () => {
-    const messageToSend: Message = {
-      id: `m${Date.now()}`,
-      sender: 'me',
-      type: 'event',
-      text: '',
-      event: { title: 'Team Meeting', dateTime: new Date(new Date().getTime() + 24 * 60 * 60 * 1000) },
-      timestamp: new Date(),
-      status: 'sent',
-    };
-    setMessages(prev => [...prev, messageToSend]);
-    toast({ title: 'Event created' });
-  };
-  
   const handleCapture = (dataUrl: string) => {
       setImageToSend(dataUrl);
+      showToast('Image captured!', 'Sending image is not yet implemented.');
   };
 
   const handleEmojiSelect = (emoji: EmojiClickData) => {
@@ -272,7 +194,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         <div className="flex items-center">
            <Avatar className="h-10 w-10 mr-3 relative cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <AvatarImage src={otherParticipant.profile_picture_url || ''} alt={otherParticipant.username} />
-            <AvatarFallback>{otherParticipant.username.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{otherParticipant.username.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{chat.name} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
@@ -280,7 +202,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Video call', 'This feature is not yet implemented.')}><Video className="h-5 w-5" /><span className="sr-only">Video call</span></Button>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Video call')}><Video className="h-5 w-5" /><span className="sr-only">Video call</span></Button>
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => setIsSearchOpen(true)}><Search className="h-5 w-5" /><span className="sr-only">Search</span></Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"><MoreVertical className="h-5 w-5" /><span className="sr-only">More options</span></Button></DropdownMenuTrigger>
@@ -293,11 +215,11 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                     {isMuted ? <Bell className="mr-2 h-4 w-4" /> : <BellOff className="mr-2 h-4 w-4" />}
                     <span>{isMuted ? 'Unmute' : 'Mute'} notifications</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => showToast('Disappearing messages', 'This feature is not yet implemented.')}>
+                <DropdownMenuItem onClick={() => showToast('Disappearing messages')}>
                     <Timer className="mr-2 h-4 w-4" />
                     <span>Disappearing messages</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => showToast('Wallpaper', 'This feature is not yet implemented.')}>
+                <DropdownMenuItem onClick={() => showToast('Wallpaper')}>
                     <Wallpaper className="mr-2 h-4 w-4" />
                     <span>Wallpaper</span>
                 </DropdownMenuItem>
@@ -307,7 +229,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                         <span>More</span>
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                        <DropdownMenuItem onClick={() => showToast('Report', 'This feature is not yet implemented.')}>
+                        <DropdownMenuItem onClick={() => showToast('Report')}>
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             <span>Report</span>
                         </DropdownMenuItem>
@@ -315,15 +237,15 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                             <Ban className="mr-2 h-4 w-4" />
                             <span>{isBlocked ? 'Unblock' : 'Block'}</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setMessages([]); toast({ title: 'Chat cleared' }); }}>
+                        <DropdownMenuItem onClick={() => showToast('Clear Chat', 'This would clear messages if implemented.')}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             <span>Clear chat</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => showToast('Export chat', 'This feature is not yet implemented.')}>
+                        <DropdownMenuItem onClick={() => showToast('Export chat')}>
                             <Download className="mr-2 h-4 w-4" />
                             <span>Export chat</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => showToast('Add shortcut', 'This feature is not yet implemented.')}>
+                        <DropdownMenuItem onClick={() => showToast('Add shortcut')}>
                             <SquarePlus className="mr-2 h-4 w-4" />
                             <span>Add shortcut</span>
                         </DropdownMenuItem>
@@ -339,7 +261,12 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       <CardContent className="flex-1 overflow-hidden p-0 relative">
         <ScrollArea className="h-full" viewportRef={scrollViewportRef}>
            <div className="p-4 space-y-2">
-            {messages.map((msg, index) => {
+            {isLoadingMessages && (
+                 <div className="flex justify-center items-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                 </div>
+            )}
+            {!isLoadingMessages && messages.map((msg, index) => {
               const showDateSeparator = index === 0 || !isSameDay(messages[index - 1].timestamp, msg.timestamp);
               
               return (
@@ -371,7 +298,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                                 <p className="font-medium truncate">{msg.contactInfo.name}</p>
                                 <p className='text-xs text-muted-foreground'>Contact</p>
                             </div>
-                            <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Contact', 'This would open the contact info.')}>View</Button>
+                            <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Contact')}>View</Button>
                         </div>
                       )}
                       {msg.type === 'poll' && msg.poll && (
@@ -416,7 +343,7 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                                   <p className="font-semibold truncate">{msg.event.title}</p>
                                   <p className="text-xs text-muted-foreground">{format(msg.event.dateTime, 'PPp')}</p>
                               </div>
-                              <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Event', 'This would open event details.')}>View</Button>
+                              <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Event')}>View</Button>
                           </div>
                       )}
                     {msg.text && <p className="text-sm">{msg.text}</p>}
@@ -491,11 +418,12 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             onChange={(e) => setNewMessage(e.target.value)}
             className="flex-1 bg-background border-input focus-visible:ring-primary"
             autoComplete="off"
-            disabled={!!imageToSend}
+            disabled={sendMessageMutation.isPending || !!imageToSend}
           />
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
-          <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90">
-            <SendHorizonal className="h-5 w-5" /><span className="sr-only">Send message</span>
+          <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90" disabled={sendMessageMutation.isPending}>
+            {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+            <span className="sr-only">Send message</span>
           </Button>
         </form>
       </CardFooter>
