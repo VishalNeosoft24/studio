@@ -82,6 +82,9 @@ export default function ContactList({ contacts, selectedContactId, onSelectConta
       </div>
       <ScrollArea className="flex-1">
         <div className="p-0">
+          <div className="p-4">
+            <h2 className="text-primary font-semibold text-sm">CONTACTS ON CHATTERBOX</h2>
+          </div>
           {filteredContacts.map((contact) => (
             <button
               key={contact.id}
@@ -90,28 +93,12 @@ export default function ContactList({ contacts, selectedContactId, onSelectConta
               aria-current={selectedContactId === contact.id ? 'page' : undefined}
             >
               <Avatar className="h-10 w-10 mr-3 relative">
-                <AvatarImage src={contact.avatarUrl} alt={contact.name} />
-                <AvatarFallback>{contact.name.charAt(0)}</AvatarFallback>
-                {contact.status === 'online' && (
-                   <Circle className="absolute bottom-0 right-0 h-3 w-3 fill-accent stroke-accent border-2 border-background rounded-full" />
-                )}
+                <AvatarImage src={contact.avatarUrl || ''} alt={contact.name} />
+                <AvatarFallback>{contact.name.charAt(0).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-medium truncate">{contact.name}</h3>
-                  <span className="text-xs text-muted-foreground">{contact.lastMessageTimestamp}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-muted-foreground truncate">{contact.lastMessage}</p>
-                    <div className='flex items-center space-x-2'>
-                      {contact.isMuted && <BellOff className="h-4 w-4 text-muted-foreground" />}
-                      {contact.unreadCount && contact.unreadCount > 0 && (
-                      <div className="bg-accent text-accent-foreground text-xs font-medium rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center flex-shrink-0">
-                          {contact.unreadCount}
-                      </div>
-                      )}
-                    </div>
-                </div>
+                <h3 className="font-medium truncate">{contact.name}</h3>
+                <p className="text-sm text-muted-foreground truncate">{contact.about || 'Hey there! I am using Chatterbox.'}</p>
               </div>
             </button>
           ))}

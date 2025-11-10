@@ -1,5 +1,6 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload } from '@/types';
+
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -62,6 +63,19 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
 export async function getChats(): Promise<Chat[]> {
   return await apiFetch("/chats/");
+}
+
+export async function getContacts(): Promise<Contact[]> {
+    const apiContacts: ApiContact[] = await apiFetch("/contacts/");
+    
+    // Transform the nested API response into the flat structure our UI expects
+    return apiContacts.map(item => ({
+        id: item.contact.id.toString(),
+        name: item.contact.username,
+        avatarUrl: item.contact.profile_picture_url,
+        isMuted: item.is_muted,
+        about: item.contact.about_status
+    }));
 }
 
 

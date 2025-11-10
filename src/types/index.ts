@@ -1,5 +1,6 @@
 
 
+
 // For the UI, simplified
 export type User = {
     id: string;
@@ -55,15 +56,27 @@ export type Message = {
   status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
 };
 
+
+// Represents the raw contact data from your API
+export type ApiContact = {
+    id: number;
+    contact: {
+        id: number;
+        username: string;
+        profile_picture_url: string | null;
+        about_status: string | null;
+    };
+    is_blocked: boolean;
+    is_muted: boolean;
+    created_at: string;
+};
+
+// Represents a contact transformed for the UI
 export type Contact = {
-    id: string;
+    id: string; // The contact's user ID
     name: string;
-    avatarUrl: string;
-    lastMessage: string;
-    lastMessageTimestamp: string;
-    status: string;
-    unreadCount?: number;
-    isMuted?: boolean;
-    about: string;
+    avatarUrl: string | null;
+    isMuted: boolean;
+    about: string | null;
 };
     
