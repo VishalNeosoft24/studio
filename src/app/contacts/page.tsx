@@ -9,7 +9,7 @@ import ChatPlaceholder from '@/components/app/chat-placeholder';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getContacts, createChat, getCurrentUserId } from '@/lib/api';
+import { getContacts, createChat, getCurrentUserId, getChats } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2 } from 'lucide-react';
 
@@ -35,15 +35,22 @@ export default function ContactsPage() {
   const queryClient = useQueryClient();
   const [isCreatingChat, setIsCreatingChat] = useState<string | null>(null);
 
-  const { data: contacts, isLoading, isError } = useQuery<Contact[]>({
+  const { data: contacts, isLoading: isLoadingContacts, isError: isErrorContacts } = useQuery<Contact[]>({
     queryKey: ['contacts'],
     queryFn: getContacts,
   });
 
-  const handleSelectContact = async (id: string) => {
-    setIsCreatingChat(id);
-    const contact = contacts?.find(c => c.id === id);
+  // Fetch existing chats to check against
+  const { data: existingChats } = useQuery<Chat[]>({
+    queryKey: ['chats'],
+    queryFn: getChats,
+  });
+
+  const handleSelectContact = async (contactId: string) => {
+    setIsCreatingChat(contactId);
+    const contact = contacts?.find(c => c.id === contactId);
     const currentUserId = getCurrentUserId();
+    const contactUserId = parseInt(contactId, 10);
 
     if (!contact || !currentUserId) {
       toast({
@@ -55,29 +62,40 @@ export default function ContactsPage() {
       return;
     }
     
+    // --- The Core Fix: Check for existing chat first ---
+    const foundChat = existingChats?.find(chat => 
+        chat.chat_type === 'private' &&
+        chat.participants.length === 2 &&
+        chat.participants.some(p => p.id === currentUserId) &&
+        chat.participants.some(p => p.id === contactUserId)
+    );
+
+    if (foundChat) {
+        console.log(`Found existing chat (ID: ${foundChat.id}), redirecting...`);
+        router.push(`/chat?chatId=${foundChat.id}`);
+        // No need to set isCreatingChat to null here as we are navigating away
+        return;
+    }
+    // --- End of fix ---
+
+    console.log("No existing chat found, creating a new one...");
     try {
-      // For private chats, the name is handled by the frontend to show the other user's name.
-      // The backend can leave the 'name' field blank for private chats.
-      const chat = await createChat({
+      const newChat = await createChat({
         name: '', // Pass an empty name for private chats
         chat_type: 'private',
-        participant_ids: [currentUserId, parseInt(id, 10)],
+        participant_ids: [currentUserId, contactUserId],
       });
       
-      // Manually add the new/existing chat to the query cache to avoid a refetch
+      // Manually add the new chat to the query cache to avoid a refetch
       queryClient.setQueryData(['chats'], (oldData: Chat[] | undefined) => {
-        const existingChat = oldData?.find(c => c.id === chat.id);
-        if (existingChat) {
-          return oldData;
-        }
-        return oldData ? [...oldData, chat] : [chat];
+        return oldData ? [...oldData, newChat] : [newChat];
       });
 
       // Redirect to the chat page, with the specific chat ID in the URL
-      router.push(`/chat?chatId=${chat.id}`);
+      router.push(`/chat?chatId=${newChat.id}`);
 
     } catch (error: any) {
-      console.error('Failed to create or get chat:', error);
+      console.error('Failed to create chat:', error);
       toast({
         variant: 'destructive',
         title: 'Failed to open chat',
@@ -92,9 +110,9 @@ export default function ContactsPage() {
     <div className="flex h-screen w-screen bg-secondary overflow-hidden">
       {/* Left sidebar - Contact list */}
       <div className="w-full max-w-xs lg:max-w-sm xl:max-w-md border-r bg-background flex flex-col">
-        {isLoading ? (
+        {isLoadingContacts ? (
           <ContactListSkeleton />
-        ) : isError ? (
+        ) : isErrorContacts ? (
           <div className="p-4 text-center text-destructive">Failed to load contacts.</div>
         ) : (
           <ContactList
