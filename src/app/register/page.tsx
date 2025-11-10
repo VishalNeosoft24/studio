@@ -17,7 +17,13 @@ import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
     username: z.string().min(2, { message: 'Username must be at least 2 characters.' }),
+    email: z.string().email({ message: 'Please enter a valid email address.' }),
+    phone_number: z.string().min(10, { message: 'Please enter a valid phone number.' }),
     password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
+    password2: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
+}).refine(data => data.password === data.password2, {
+    message: 'Passwords do not match.',
+    path: ['password2'], // Set the error on the confirmation field
 });
 
 export default function RegisterPage() {
@@ -29,24 +35,27 @@ export default function RegisterPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: '',
+      email: '',
+      phone_number: '',
       password: '',
+      password2: '',
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-        const newUser = await register(values.username, values.password);
+        const newUser = await register(values);
         toast({
             title: 'Registration Successful',
             description: "You can now log in with your new account.",
         });
         router.push('/login');
-    } catch (error) {
+    } catch (error: any) {
         toast({
             variant: 'destructive',
             title: 'Registration Failed',
-            description: 'This username might already be taken. Please try again.',
+            description: error.message || 'An unexpected error occurred. Please try again.',
         });
     } finally {
         setIsLoading(false);
@@ -59,7 +68,7 @@ export default function RegisterPage() {
       description="Get started with Chatterbox by creating a new account."
     >
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
             name="username"
@@ -75,10 +84,49 @@ export default function RegisterPage() {
           />
           <FormField
             control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="you@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone_number"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <FormControl>
+                  <Input placeholder="1234567890" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
             name="password"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="••••••••" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password2"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm Password</FormLabel>
                 <FormControl>
                   <Input type="password" placeholder="••••••••" {...field} />
                 </FormControl>

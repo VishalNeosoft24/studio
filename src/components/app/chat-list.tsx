@@ -7,11 +7,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import ProfileSheet from './profile-sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MessageSquarePlus, MoreVertical, Users, CircleDashed } from 'lucide-react';
+import { MessageSquarePlus, MoreVertical, Users, CircleDashed, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { logout } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 
 type ChatListProps = {
@@ -26,6 +28,7 @@ const MOCK_CURRENT_USER_ID = 3;
 
 export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatListProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
 
@@ -33,6 +36,12 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
     toast({ title: title, description: 'This feature is not yet implemented.' });
   };
   
+  const handleLogout = () => {
+    logout();
+    toast({ title: "Logged Out", description: "You have been successfully logged out." });
+    router.push('/login');
+  };
+
   const filteredChats = chats.filter(chat => 
     chat.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -82,7 +91,10 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                 <DropdownMenuItem onClick={() => showToast('Select chats')}>Select chats</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => showToast('Settings')}>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => showToast('Log out')}>Log out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

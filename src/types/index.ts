@@ -1,10 +1,19 @@
 
+
 // For the UI, simplified
 export type User = {
     id: string;
     username: string;
     avatarUrl?: string;
     about?: string;
+}
+
+export type RegisterPayload = {
+    username: string;
+    email: string;
+    phone_number: string;
+    password: string;
+    password2: string;
 }
 
 export type Participant = {

@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage, Message } from '@/types';
+import type { User, Chat, ApiMessage, Message, RegisterPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -44,8 +44,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     // Special handling for 401 Unauthorized to redirect to login
     if (response.status === 401 && typeof window !== 'undefined') {
        console.error("Unauthorized request, redirecting to login.");
-       localStorage.removeItem('access_token');
-       localStorage.removeItem('refresh_token');
+       logout();
        window.location.href = '/login';
     }
     const errorData = await response.json().catch(() => ({ detail: 'An unknown API error occurred.' }));
@@ -118,28 +117,37 @@ export async function login(username: string, password: string) {
 
 
 /** 🆕 Register a new user */
-export async function register(username: string, password: string): Promise<User> {
-    console.log('Registering user:', username);
+export async function register(payload: RegisterPayload): Promise<User> {
+    console.log('Registering user:', payload.username);
 
     const response = await fetch(`${API_BASE_URL}/auth/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(payload),
     });
     
     const data = await response.json();
     
     if (!response.ok) {
-        // Extract error message from Django REST Framework response
-        const errorMsg = data.username?.[0] || data.password?.[0] || 'Registration failed.';
+        // Extract a generic or specific error message from the backend response
+        const errorMsg = data.detail || Object.values(data).flat().join(' ') || 'Registration failed.';
         throw new Error(errorMsg);
     }
     
     if (data && data.username) {
         console.log('Registration successful, auto logging in...');
-        await login(username, password);
+        await login(payload.username, payload.password);
         return data as User;
     }
 
     throw new Error('Registration failed (unexpected response)');
+}
+
+/** 🔒 Log out the user */
+export function logout() {
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        console.log('User logged out, tokens removed.');
+    }
 }

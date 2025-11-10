@@ -16,8 +16,8 @@ import { login } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  username: z.string().min(1, { message: 'Username is required.' }),
-  password: z.string().min(1, { message: 'Password is required.' }),
+  username: z.string().min(2, { message: 'Username must be at least 2 characters.' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
 });
 
 export default function LoginPage() {
