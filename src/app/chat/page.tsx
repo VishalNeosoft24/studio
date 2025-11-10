@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -10,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
 import { getChats } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 
 function ChatListSkeleton() {
@@ -29,24 +31,39 @@ function ChatListSkeleton() {
 }
 
 export default function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(() => searchParams.get('chatId'));
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
     queryFn: getChats,
   });
 
-  // Automatically select the first chat when data is loaded
+  // Update selected chat when URL param changes
   useEffect(() => {
-    if (chats && chats.length > 0 && !selectedChatId) {
-      setSelectedChatId(chats[0].id);
+    setSelectedChatId(searchParams.get('chatId'));
+  }, [searchParams]);
+
+  // Update URL when chat is selected from the list
+  const handleSelectChat = (id: string) => {
+    setSelectedChatId(id);
+    router.push(`/chat?chatId=${id}`, { scroll: false });
+  };
+
+  // Automatically select the first chat if no chat is selected via URL
+  useEffect(() => {
+    if (!selectedChatId && chats && chats.length > 0) {
+      handleSelectChat(chats[0].id);
     }
-  }, [chats, selectedChatId]);
+  }, [chats, selectedChatId]); // handleSelectChat is stable
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
 
   const handleCloseChat = () => {
     setSelectedChatId(null);
+    router.push('/chat', { scroll: false });
   };
 
   return (
@@ -61,7 +78,7 @@ export default function ChatPage() {
           <ChatList
             chats={chats || []}
             selectedChatId={selectedChatId}
-            onSelectChat={setSelectedChatId}
+            onSelectChat={handleSelectChat}
           />
         )}
       </div>

@@ -1,8 +1,9 @@
 
+
 'use client';
 
 import { useState } from 'react';
-import type { Contact } from '@/types';
+import type { Contact, Chat } from '@/types';
 import ContactList from '@/components/app/contact-list';
 import ChatPlaceholder from '@/components/app/chat-placeholder';
 import { useRouter } from 'next/navigation';
@@ -55,29 +56,30 @@ export default function ContactsPage() {
     }
     
     try {
-      // The backend might return an existing chat or create a new one.
-      await createChat({
+      // The backend will either create a new chat or return an existing one.
+      const chat = await createChat({
         name: contact.name,
         chat_type: 'private',
         participant_ids: [currentUserId, parseInt(id, 10)],
       });
       
-      // Invalidate the chats query to refetch the list on the main page
-      await queryClient.invalidateQueries({ queryKey: ['chats'] });
-
-      toast({
-        title: 'Chat started!',
-        description: `Your chat with ${contact.name} is ready.`,
+      // Manually add the new/existing chat to the query cache to avoid a refetch
+      queryClient.setQueryData(['chats'], (oldData: Chat[] | undefined) => {
+        const existingChat = oldData?.find(c => c.id === chat.id);
+        if (existingChat) {
+          return oldData;
+        }
+        return oldData ? [...oldData, chat] : [chat];
       });
 
-      // Redirect to the chat page where the new chat will appear
-      router.push('/chat');
+      // Redirect to the chat page, with the specific chat ID in the URL
+      router.push(`/chat?chatId=${chat.id}`);
 
     } catch (error: any) {
-      console.error('Failed to create chat:', error);
+      console.error('Failed to create or get chat:', error);
       toast({
         variant: 'destructive',
-        title: 'Failed to create chat',
+        title: 'Failed to open chat',
         description: error.message || 'An unexpected error occurred.',
       });
     } finally {
@@ -107,7 +109,7 @@ export default function ContactsPage() {
         {isCreatingChat ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                <h2 className="text-xl font-semibold">Starting new chat...</h2>
+                <h2 className="text-xl font-semibold">Opening chat...</h2>
             </div>
         ) : (
             <ChatPlaceholder />

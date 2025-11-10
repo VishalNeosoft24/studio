@@ -1,4 +1,5 @@
 
+
 import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -70,6 +71,7 @@ export async function getChats(): Promise<Chat[]> {
 }
 
 export async function createChat(payload: CreateChatPayload): Promise<Chat> {
+  // This can return a 200 (existing) or 201 (new), which apiFetch handles.
   return await apiFetch('/chats/', {
     method: 'POST',
     body: JSON.stringify(payload),
