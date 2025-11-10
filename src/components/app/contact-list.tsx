@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Contact } from '@/types';
@@ -6,24 +7,33 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Circle, MessageSquarePlus, MoreVertical, Users, CircleDashed, BellOff } from 'lucide-react';
+import { MessageSquarePlus, MoreVertical, Users, CircleDashed, LogOut, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import ProfileSheet from './profile-sheet';
+import { logout } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 interface ContactListProps {
   contacts: Contact[];
-  selectedContactId: string | null;
   onSelectContact: (id: string) => void;
+  isCreatingChatId: string | null;
 }
 
-export default function ContactList({ contacts, selectedContactId, onSelectContact }: ContactListProps) {
+export default function ContactList({ contacts, onSelectContact, isCreatingChatId }: ContactListProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
 
   const showToast = (title: string) => {
     toast({ title: title, description: 'This feature is not yet implemented.' });
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast({ title: "Logged Out", description: "You have been successfully logged out." });
+    router.push('/login');
   };
   
   const filteredContacts = contacts.filter(contact => 
@@ -49,9 +59,9 @@ export default function ContactList({ contacts, selectedContactId, onSelectConta
               <CircleDashed className="h-5 w-5" />
               <span className="sr-only">Status</span>
             </Button>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('New Chat')}>
+             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => router.push('/chat')}>
               <MessageSquarePlus className="h-5 w-5" />
-              <span className="sr-only">New Chat</span>
+              <span className="sr-only">Chats</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -67,14 +77,17 @@ export default function ContactList({ contacts, selectedContactId, onSelectConta
                 <DropdownMenuItem onClick={() => showToast('Select chats')}>Select chats</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => showToast('Settings')}>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => showToast('Log out')}>Log out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
       </div>
       <div className="p-3 border-b">
         <Input 
-          placeholder="Search or start new chat" 
+          placeholder="Search contacts" 
           className="bg-secondary border-none focus-visible:ring-primary"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -89,8 +102,9 @@ export default function ContactList({ contacts, selectedContactId, onSelectConta
             <button
               key={contact.id}
               onClick={() => onSelectContact(contact.id)}
-              className={`flex items-center w-full p-3 hover:bg-secondary transition-colors text-left ${selectedContactId === contact.id ? 'bg-secondary' : ''}`}
-              aria-current={selectedContactId === contact.id ? 'page' : undefined}
+              className="flex items-center w-full p-3 hover:bg-secondary transition-colors text-left"
+              disabled={!!isCreatingChatId}
+              aria-current={isCreatingChatId === contact.id ? 'page' : undefined}
             >
               <Avatar className="h-10 w-10 mr-3 relative">
                 <AvatarImage src={contact.avatarUrl || ''} alt={contact.name} />
@@ -100,6 +114,7 @@ export default function ContactList({ contacts, selectedContactId, onSelectConta
                 <h3 className="font-medium truncate">{contact.name}</h3>
                 <p className="text-sm text-muted-foreground truncate">{contact.about || 'Hey there! I am using Chatterbox.'}</p>
               </div>
+              {isCreatingChatId === contact.id && <Loader2 className="h-5 w-5 animate-spin" />}
             </button>
           ))}
         </div>

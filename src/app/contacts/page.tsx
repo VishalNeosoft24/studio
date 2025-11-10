@@ -7,9 +7,10 @@ import ContactList from '@/components/app/contact-list';
 import ChatPlaceholder from '@/components/app/chat-placeholder';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
-import { getContacts } from '@/lib/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getContacts, createChat, getCurrentUserId } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Loader2 } from 'lucide-react';
 
 function ContactListSkeleton() {
   return (
@@ -30,27 +31,58 @@ function ContactListSkeleton() {
 export default function ContactsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [isCreatingChat, setIsCreatingChat] = useState<string | null>(null);
 
   const { data: contacts, isLoading, isError } = useQuery<Contact[]>({
     queryKey: ['contacts'],
     queryFn: getContacts,
   });
 
-  const handleSelectContact = (id: string) => {
-    // In a real app, you would check if a chat with this contact
-    // already exists. If so, navigate to that chat.
-    // Otherwise, you might have an API to create a new chat.
-    // For now, we'll just show a toast and navigate back to the main chat page.
+  const handleSelectContact = async (id: string) => {
+    setIsCreatingChat(id);
     const contact = contacts?.find(c => c.id === id);
-    if(contact) {
-        toast({
-            title: "Starting new chat...",
-            description: `This would open a chat with ${contact.name}. This feature is not fully implemented yet.`
-        })
+    const currentUserId = getCurrentUserId();
+
+    if (!contact || !currentUserId) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not create chat. User or contact not found.',
+      });
+      setIsCreatingChat(null);
+      return;
     }
-    // Simulate navigating to a chat
-    router.push('/chat');
+    
+    try {
+      // The backend might return an existing chat or create a new one.
+      await createChat({
+        name: contact.name,
+        chat_type: 'private',
+        participant_ids: [currentUserId, parseInt(id, 10)],
+      });
+      
+      // Invalidate the chats query to refetch the list on the main page
+      await queryClient.invalidateQueries({ queryKey: ['chats'] });
+
+      toast({
+        title: 'Chat started!',
+        description: `Your chat with ${contact.name} is ready.`,
+      });
+
+      // Redirect to the chat page where the new chat will appear
+      router.push('/chat');
+
+    } catch (error: any) {
+      console.error('Failed to create chat:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to create chat',
+        description: error.message || 'An unexpected error occurred.',
+      });
+    } finally {
+      setIsCreatingChat(null);
+    }
   };
 
   return (
@@ -64,15 +96,22 @@ export default function ContactsPage() {
         ) : (
           <ContactList
             contacts={contacts || []}
-            selectedContactId={selectedContactId}
             onSelectContact={handleSelectContact}
+            isCreatingChatId={isCreatingChat}
           />
         )}
       </div>
 
       {/* Right section - Placeholder */}
       <div className="flex-1 flex flex-col">
-        <ChatPlaceholder />
+        {isCreatingChat ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <h2 className="text-xl font-semibold">Starting new chat...</h2>
+            </div>
+        ) : (
+            <ChatPlaceholder />
+        )}
       </div>
     </div>
   );

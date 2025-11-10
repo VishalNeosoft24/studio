@@ -1,6 +1,5 @@
 
-
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact } from '@/types';
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -57,12 +56,24 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
       return null;
   }
 
+  // Handle cases where creating a resource might return an existing one (200 OK) or a new one (201 Created)
+  if (response.status === 200 || response.status === 201) {
+    return response.json();
+  }
+  
   return response.json();
 }
 
 
 export async function getChats(): Promise<Chat[]> {
   return await apiFetch("/chats/");
+}
+
+export async function createChat(payload: CreateChatPayload): Promise<Chat> {
+  return await apiFetch('/chats/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getContacts(): Promise<Contact[]> {
