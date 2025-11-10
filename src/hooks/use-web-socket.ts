@@ -1,12 +1,13 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 
 export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) => void) {
   const ws = useRef<WebSocket | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     if (!chatId) {
@@ -20,6 +21,7 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
 
     socket.onopen = () => {
       console.log('WebSocket connection established for chat', chatId);
+      setIsConnected(true);
     };
 
     socket.onmessage = (event) => {
@@ -44,17 +46,17 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
 
     socket.onerror = (error) => {
       console.error('WebSocket error:', error);
+      setIsConnected(false);
     };
 
     ws.current = socket;
 
-    // Cleanup function to close the WebSocket connection when the component unmounts
     return () => {
       if (ws.current && ws.current.readyState === WebSocket.OPEN) {
         ws.current.close();
       }
     };
-  }, [chatId, onMessage]); // Re-run the effect if chatId or the onMessage handler changes
+  }, [chatId, onMessage]);
 
   // Function to send a message through the WebSocket
   // const sendMessage = (message: string) => {
@@ -84,5 +86,3 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
 
   return { sendMessage };
 }
-
-    

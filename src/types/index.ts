@@ -1,5 +1,4 @@
 
-
 // For the UI, simplified
 export type User = {
     id: string;
@@ -22,13 +21,17 @@ export type Chat = {
     created_at: string;
 }
 
-// Represents the raw message from your DRF API
+// Represents the raw message from your DRF API (via WebSocket or REST)
 export type ApiMessage = {
     id: number;
-    sender: Participant;
+    sender: Participant; // This might be nested in your WS response
+    sender_id: number;
+    sender_username: string;
     content: string;
+    message: string; // Your WS consumer seems to use 'message' for content
     message_type: 'text' | 'image' | 'file'; // As defined by your backend
     timestamp: string; // ISO 8601 date string
+    created_at: string; // Your WS consumer uses this
 };
 
 

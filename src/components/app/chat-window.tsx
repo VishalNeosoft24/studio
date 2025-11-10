@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Message, Chat, ApiMessage } from '@/types';
+import type { Message, Chat, ApiMessage, Participant } from '@/types';
 import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import Image from 'next/image';
@@ -17,10 +17,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import CameraViewDialog from './camera-view-dialog';
-import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay, parseISO } from 'date-fns';
 import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
+<<<<<<< HEAD
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMessages, sendMessageViaAPI, getCurrentUserId } from '@/lib/api';
+=======
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getMessages, getCurrentUserId } from '@/lib/api';
+>>>>>>> fa10fbf (here there is an issues in sending and receiving message in chat. when i)
 import { useWebSocket } from '@/hooks/use-web-socket';
 
 
@@ -87,7 +92,7 @@ const transformApiMessage = (msg: any): Message => {
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
       select: (apiMessages) => apiMessages.map(transformApiMessage),
-      staleTime: 5000, // Keep data fresh for 5 seconds
+      staleTime: Infinity, // Rely on WebSocket for updates, not polling
   });
   
   // WebSocket connection for real-time messages
@@ -223,7 +228,6 @@ const transformApiMessage = (msg: any): Message => {
 
   useEffect(() => {
     if (scrollViewportRef.current) {
-        // A small delay helps ensure the DOM has updated before scrolling
         setTimeout(() => {
             if (scrollViewportRef.current) {
                 scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
@@ -300,8 +304,6 @@ const transformApiMessage = (msg: any): Message => {
       if (file) {
           const reader = new FileReader();
           reader.onload = (event) => {
-              // This is still mock. To implement fully, you'd upload the file
-              // then send the URL in a message.
               setImageToSend(event.target?.result as string);
           };
           reader.readAsDataURL(file);
@@ -310,8 +312,6 @@ const transformApiMessage = (msg: any): Message => {
   
   const sendMockMessage = (type: Message['type'], data: Partial<Message>) => {
       showToast(`Sending ${type}...`, 'This part is not connected to the backend yet.');
-      // This is a placeholder to demonstrate UI.
-      // To implement, you would need backend support for each message type.
   };
   
   const handleSendDocument = () => sendMockMessage('document', { document: { name: 'project-brief.pdf', size: '1.2 MB' }});
@@ -349,9 +349,11 @@ const transformApiMessage = (msg: any): Message => {
     }
   }
 
+  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', profile_picture_url: null };
+
   return (
     <>
-    <ContactInfoSheet participant={otherParticipant} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
+    <ContactInfoSheet participant={otherParticipantSafe} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
     <CameraViewDialog open={isCameraOpen} onOpenChange={setCameraOpen} onCapture={handleCapture} />
 
     <Card className="flex flex-col h-full w-full rounded-none border-none shadow-none bg-transparent">
@@ -372,12 +374,12 @@ const transformApiMessage = (msg: any): Message => {
         <>
         <div className="flex items-center">
            <Avatar className="h-10 w-10 mr-3 relative cursor-pointer" onClick={() => setContactInfoOpen(true)}>
-            <AvatarImage src={otherParticipant.profile_picture_url || ''} alt={otherParticipant.username} />
-            <AvatarFallback>{otherParticipant.username.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarImage src={otherParticipantSafe.profile_picture_url || ''} alt={otherParticipantSafe.username} />
+            <AvatarFallback>{otherParticipantSafe.username.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{chat.name} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{isBlocked ? 'Blocked' : isTyping ? 'typing...' : 'Online'}</p>
+            <p className="text-xs text-muted-foreground">{isBlocked ? 'Blocked' : isTyping ? 'typing...' : (isConnected ? 'Online' : 'Connecting...')}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -604,11 +606,11 @@ const transformApiMessage = (msg: any): Message => {
             onChange={(e) => setNewMessage(e.target.value)}
             className="flex-1 bg-background border-input focus-visible:ring-primary"
             autoComplete="off"
-            disabled={sendMessageMutation.isPending || !!imageToSend}
+            disabled={!isConnected || !!imageToSend}
           />
           <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
-          <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90" disabled={sendMessageMutation.isPending}>
-            {sendMessageMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+          <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90" disabled={!isConnected || !newMessage.trim()}>
+            <SendHorizonal className="h-5 w-5" />
             <span className="sr-only">Send message</span>
           </Button>
         </form>
@@ -618,5 +620,3 @@ const transformApiMessage = (msg: any): Message => {
     </>
   );
 }
-
-    
