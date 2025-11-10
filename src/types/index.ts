@@ -55,4 +55,15 @@ export type Message = {
   status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
 };
 
+export type Contact = {
+    id: string;
+    name: string;
+    avatarUrl: string;
+    lastMessage: string;
+    lastMessageTimestamp: string;
+    status: string;
+    unreadCount?: number;
+    isMuted?: boolean;
+    about: string;
+};
     

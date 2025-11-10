@@ -73,7 +73,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
               <CircleDashed className="h-5 w-5" />
               <span className="sr-only">Status</span>
             </Button>
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('New Chat')}>
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => router.push('/contacts')}>
               <MessageSquarePlus className="h-5 w-5" />
               <span className="sr-only">New Chat</span>
             </Button>
