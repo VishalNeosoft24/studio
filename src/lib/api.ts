@@ -74,7 +74,7 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
 /**
  * ✉️ Send new message to a chat
  */
-export async function sendMessage(
+export async function sendMessageViaAPI(
   chatId: string,
   content: string,
   message_type: 'text' | 'image' // Add other types as needed

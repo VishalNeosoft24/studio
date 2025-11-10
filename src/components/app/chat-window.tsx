@@ -20,7 +20,7 @@ import CameraViewDialog from './camera-view-dialog';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getMessages, sendMessage, getCurrentUserId } from '@/lib/api';
+import { getMessages, sendMessageViaAPI, getCurrentUserId } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 
 
@@ -68,14 +68,20 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-  const transformApiMessage = (msg: ApiMessage): Message => ({
-    id: msg.id.toString(),
-    sender: msg.sender.id === currentUserId ? 'me' : 'contact',
-    type: 'text', // This would need to be dynamic if you support more types
-    text: msg.content,
-    timestamp: new Date(msg.timestamp),
-    status: msg.sender.id === currentUserId ? 'read' : undefined,
-  });
+const transformApiMessage = (msg: any): Message => {
+  const senderId = msg?.sender?.id ?? msg?.sender_id;
+  const content = msg?.content ?? msg?.message;
+
+  return {
+    id: msg?.id?.toString() || '',
+    sender: senderId === currentUserId ? 'me' : 'contact',
+    type: msg?.message_type || 'text',
+    text: content || '',
+    timestamp: msg?.created_at ? new Date(msg.created_at) : new Date(),
+    status: senderId === currentUserId ? 'read' : undefined,
+  };
+};
+
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
@@ -85,28 +91,85 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   });
   
   // WebSocket connection for real-time messages
-  useWebSocket(chat.id, (messageEvent) => {
-    try {
-      const newApiMessage = JSON.parse(messageEvent.data) as ApiMessage;
-      // You might want to add a check here to ensure the message belongs to this chat
-      // e.g., if (newApiMessage.chatId === chat.id)
-      const newUiMessage = transformApiMessage(newApiMessage);
 
-      queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
-        // Avoid adding duplicate messages
-        if (oldMessages.some(m => m.id === newUiMessage.id)) {
-          return oldMessages;
-        }
-        return [...oldMessages, newUiMessage];
+  // useWebSocket(chat.id, (messageEvent) => {
+  //   try {
+  //     const data = JSON.parse(messageEvent.data);
+
+  //     // ✅ Check that this is a chat message event
+  //    if (data.type === 'chat.message' && data.message) {
+  //       const newUiMessage = transformApiMessage(data.message);
+  //       queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
+  //         if (oldMessages.some(m => m.id === newUiMessage.id)) return oldMessages;
+  //         return [...oldMessages, newUiMessage];
+  //       });
+  //     } else {
+  //       console.warn('Unhandled WebSocket event type:', data.type);
+  //     }
+
+  //   } catch (e) {
+  //     console.error("Failed to parse incoming WebSocket message", e);
+  //   }
+  // });
+
+  const { sendMessage } = useWebSocket(chat.id, (messageEvent) => {
+  try {
+    const data = JSON.parse(messageEvent.data);
+    console.log("📩 WS received:", data);
+
+
+    if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
+
+      // const newUiMessage = transformApiMessage(data.message);
+      // queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
+      //   if (oldMessages.some(m => m.id === newUiMessage.id)) return oldMessages;
+      //   return [...oldMessages, newUiMessage];
+      // });
+      console.log("data.message----------------",data.message);
+      
+      const newUiMessage = transformApiMessage(data.message);
+      console.log('newUiMessage: ', newUiMessage)
+      queryClient.setQueryData<Message[]>(['messages', chat.id], (old = []) => {
+        // Ensure a new array reference to trigger re-render
+        if (old.some(m => m.id === newUiMessage.id)){
+          console.log("99999999999999999999999999999999999999999999999999999999999999",old);
+          return [...old];
+        } 
+        return [...old, newUiMessage];
       });
-    } catch (e) {
-      console.error("Failed to parse incoming WebSocket message", e);
+
+    } else if (data.type === 'delivery_status') {
+
+      // queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
+      //   oldMessages.map(m =>
+      //     m.id === data.message_id
+      //       ? { ...m, status: data.status }
+      //       : m
+      //   )
+      // );
+
+      console.log("---------------------------------check-----------------------------------------------------")
+
+
+      queryClient.setQueryData<Message[]>(['messages', chat.id], (old = []) =>
+        old.map(m =>
+          m.id === data.message_id ? { ...m, status: data.status } : m
+        )
+      );
+
     }
-  });
+    else {
+      console.warn('Unhandled WebSocket event type:', data.type);
+    }
+  } catch (e) {
+    console.error('Failed to parse incoming WebSocket message', e);
+  }
+});
+
 
 
   const sendMessageMutation = useMutation({
-    mutationFn: (content: string) => sendMessage(chat.id, content, 'text'),
+    mutationFn: (content: string) => sendMessageViaAPI(chat.id, content, 'text'),
     onMutate: async (newContent: string) => {
         // Cancel any outgoing refetches so they don't overwrite our optimistic update
         await queryClient.cancelQueries({ queryKey: ['messages', chat.id] });
@@ -114,21 +177,21 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         // Snapshot the previous value
         const previousMessages = queryClient.getQueryData<Message[]>(['messages', chat.id]);
 
-        // Create the new optimistic message
-        const optimisticMessage: Message = {
-            id: `temp-${Date.now()}`,
-            sender: 'me',
-            type: 'text',
-            text: newContent,
-            timestamp: new Date(),
-            status: 'sent',
-        };
+        // // Create the new optimistic message
+        // const optimisticMessage: Message = {
+        //     id: `temp-${Date.now()}`,
+        //     sender: 'me',
+        //     type: 'text',
+        //     text: newContent,
+        //     timestamp: new Date(),
+        //     status: 'sent',
+        // };
 
-        // Optimistically update to the new value
-        queryClient.setQueryData<Message[]>(
-          ['messages', chat.id],
-          (old = []) => [...old, optimisticMessage]
-        );
+        // // Optimistically update to the new value
+        // queryClient.setQueryData<Message[]>(
+        //   ['messages', chat.id],
+        //   (old = []) => [...old, optimisticMessage]
+        // );
 
         return { previousMessages };
     },
@@ -173,12 +236,64 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     toast({ title, description: description || 'This feature is not yet implemented.' });
   };
 
+  // const handleSendMessage = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (newMessage.trim() === '') return;
+  //   sendMessageMutation.mutate(newMessage);
+  //   setNewMessage('');
+  // };
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim() === '') return;
-    sendMessageMutation.mutate(newMessage);
+
+    const success = sendMessage(newMessage); // 👈 from WebSocket hook
+
+    if (!success) {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to send message',
+        description: 'WebSocket is not connected.',
+      });
+    } else {
+
+      // // Optionally add an optimistic message for instant UI feedback
+      // queryClient.setQueryData<Message[]>(['messages', chat.id], (old = []) => [
+      //   ...old,
+      //   {
+      //     id: `temp-${Date.now()}`,
+      //     sender: 'me',
+      //     type: 'text',
+      //     text: newMessage,
+      //     timestamp: new Date(),
+      //     status: 'sent',
+      //   },
+      // ]);
+
+      // // Create the new optimistic message
+      //   const optimisticMessage: Message = {
+      //       id: `temp-${Date.now()}`,
+      //       sender: 'me',
+      //       type: 'text',
+      //       text: newMessage,
+      //       timestamp: new Date(),
+      //       status: 'sent',
+      //   };
+
+      //   // Optimistically update to the new value
+      //   queryClient.setQueryData<Message[]>(
+      //     ['messages', chat.id],
+      //     (old = []) => [...old, optimisticMessage]
+      //   );
+
+      //   console.log("0000000000000---------------------00000000000000000000");
+        
+
+    }
+
     setNewMessage('');
   };
+
   
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
