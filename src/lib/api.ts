@@ -71,22 +71,6 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-/**
- * ✉️ Send new message to a chat
- */
-export async function sendMessageViaAPI(
-  chatId: string,
-  content: string,
-  message_type: 'text' | 'image' // Add other types as needed
-): Promise<ApiMessage> {
-  return await apiFetch(`/chats/${chatId}/messages/`, {
-    method: 'POST',
-    body: JSON.stringify({ content, message_type }),
-  });
-}
-
-
-
 export async function login(username: string, password: string) {
     console.log('Attempting login for:', username);
     
