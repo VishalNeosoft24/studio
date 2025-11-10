@@ -56,9 +56,10 @@ export default function ContactsPage() {
     }
     
     try {
-      // The backend will either create a new chat or return an existing one.
+      // For private chats, the name is handled by the frontend to show the other user's name.
+      // The backend can leave the 'name' field blank for private chats.
       const chat = await createChat({
-        name: contact.name,
+        name: '', // Pass an empty name for private chats
         chat_type: 'private',
         participant_ids: [currentUserId, parseInt(id, 10)],
       });

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
@@ -62,6 +63,9 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
+  const chatDisplayName = chat.chat_type === 'private' ? (otherParticipant?.username || chat.name) : chat.name;
+
+
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
@@ -108,12 +112,12 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   
   const toggleMute = () => {
       setIsMuted(!isMuted);
-      toast({ title: !isMuted ? `Notifications muted for ${chat.name}` : `Notifications unmuted for ${chat.name}` });
+      toast({ title: !isMuted ? `Notifications muted for ${chatDisplayName}` : `Notifications unmuted for ${chatDisplayName}` });
   }
 
   const toggleBlock = () => {
       setIsBlocked(!isBlocked);
-      toast({ title: !isBlocked ? `${chat.name} has been blocked` : `${chat.name} has been unblocked`, variant: !isBlocked ? 'destructive' : 'default' });
+      toast({ title: !isBlocked ? `${chatDisplayName} has been blocked` : `${chatDisplayName} has been unblocked`, variant: !isBlocked ? 'destructive' : 'default' });
   }
 
   const getStatusIcon = (status?: 'sent' | 'delivered' | 'read') => {
@@ -153,7 +157,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             <AvatarFallback>{otherParticipantSafe.username.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
-            <h2 className="font-semibold flex items-center">{chat.name} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
+            <h2 className="font-semibold flex items-center">{chatDisplayName} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
             <p className="text-xs text-muted-foreground">{isBlocked ? 'Blocked' : isTyping ? 'typing...' : (isConnected ? 'Online' : 'Connecting...')}</p>
           </div>
         </div>

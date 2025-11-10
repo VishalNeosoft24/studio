@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { logout } from "@/lib/api";
+import { logout, getCurrentUserId } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 
@@ -22,15 +22,12 @@ type ChatListProps = {
   onSelectChat: (id: string) => void;
 };
 
-// A (very) simple mock to get the current user ID. 
-// In a real app, this would come from a global state/context after login.
-const MOCK_CURRENT_USER_ID = 3;
-
 export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatListProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
+  const currentUserId = getCurrentUserId();
 
   const showToast = (title: string) => {
     toast({ title: title, description: 'This feature is not yet implemented.' });
@@ -42,17 +39,30 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
     router.push('/login');
   };
 
-  const filteredChats = chats.filter(chat => 
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const getOtherParticipant = (chat: Chat) => {
-    if (chat.chat_type !== 'private' || !chat.participants) {
-      return null;
+  const filteredChats = chats.filter(chat => {
+    if (chat.chat_type === 'private') {
+      const otherParticipant = chat.participants.find(p => p.id !== currentUserId);
+      return otherParticipant?.username.toLowerCase().includes(searchQuery.toLowerCase());
     }
-    return chat.participants.find(p => p.id !== MOCK_CURRENT_USER_ID);
-  };
+    return chat.name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
+  const getChatDisplayData = (chat: Chat) => {
+    if (chat.chat_type === 'private') {
+      const otherParticipant = chat.participants.find(p => p.id !== currentUserId);
+      return {
+        name: otherParticipant?.username || 'Unknown User',
+        avatarUrl: otherParticipant?.profile_picture_url || '',
+        fallback: otherParticipant?.username?.[0]?.toUpperCase() || '?',
+      };
+    }
+    // For group chats
+    return {
+      name: chat.name,
+      avatarUrl: "", // Group chats might have their own picture
+      fallback: chat.name?.[0]?.toUpperCase() || '#',
+    };
+  };
 
   return (
     <>
@@ -110,9 +120,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
        <ScrollArea className="flex-1">
         <div className="p-0">
           {filteredChats.map((chat) => {
-            const otherParticipant = getOtherParticipant(chat);
-            const avatarUrl = otherParticipant?.profile_picture_url || "";
-            const fallback = chat.name?.[0]?.toUpperCase() || "?";
+            const { name, avatarUrl, fallback } = getChatDisplayData(chat);
             
             return (
               <button
@@ -126,7 +134,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                   <AvatarFallback>{fallback}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{chat.name}</div>
+                  <div className="font-medium truncate">{name}</div>
                   <div className="text-sm text-muted-foreground truncate">
                     {/* Placeholder for last message */}
                     Last message...
