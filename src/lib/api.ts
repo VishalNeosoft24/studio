@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage } from '@/types';
+import type { User, Chat, ApiMessage, Message } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -18,7 +18,9 @@ export function getCurrentUserId(): number | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     // The user ID is in the 'user_id' field in the JWT payload
-    return parseInt(payload.user_id, 10);
+    // Ensure it's treated as a number
+    const userId = payload.user_id;
+    return typeof userId === 'string' ? parseInt(userId, 10) : userId;
   } catch (error) {
     console.error("Failed to parse token:", error);
     return null;
@@ -70,6 +72,24 @@ export async function getChats(): Promise<Chat[]> {
 export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
+
+export function transformApiMessage(msg: any): Message {
+    const currentUserId = getCurrentUserId();
+    // Handle both REST and WebSocket message structures
+    const senderId = msg?.sender?.id ?? msg?.sender_id;
+    const content = msg?.content ?? msg?.message;
+    const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
+  
+    return {
+      id: msg?.id?.toString() || `temp-${Date.now()}`,
+      sender: senderId === currentUserId ? 'me' : 'contact',
+      type: msg?.message_type || 'text',
+      text: content || '',
+      timestamp: timestamp,
+      status: senderId === currentUserId ? 'read' : undefined, // This is a simplification
+    };
+};
+
 
 export async function login(username: string, password: string) {
     console.log('Attempting login for:', username);
@@ -123,5 +143,3 @@ export async function register(username: string, password: string): Promise<User
 
     throw new Error('Registration failed (unexpected response)');
 }
-
-    

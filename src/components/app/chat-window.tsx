@@ -2,7 +2,7 @@
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import React from 'react';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getMessages, getCurrentUserId } from '@/lib/api';
+import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
 
@@ -45,22 +45,7 @@ interface ChatWindowProps {
   onCloseChat: () => void;
 }
 
-const transformApiMessage = (msg: any): Message => {
-    const senderId = msg?.sender?.id ?? msg?.sender_id;
-    const content = msg?.content ?? msg?.message;
-    const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
-  
-    return {
-      id: msg?.id?.toString() || `temp-${Date.now()}`,
-      sender: senderId === getCurrentUserId() ? 'me' : 'contact',
-      type: msg?.message_type || 'text',
-      text: content || '',
-      timestamp: timestamp,
-      status: senderId === getCurrentUserId() ? 'read' : undefined,
-    };
-  };
-
-export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
+function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isTyping, setIsTyping] = useState(false);
@@ -84,13 +69,12 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  useWebSocket(chat.id, (messageEvent) => {
+  const handleWebSocketMessage = useCallback((messageEvent: MessageEvent) => {
     try {
       const data = JSON.parse(messageEvent.data);
       console.log("📩 WS received:", data);
 
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        // Invalidate the query to trigger a refetch, which will include the new message
         queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
       } else if (data.type === 'delivery_status') {
         queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
@@ -104,11 +88,9 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     } catch (e) {
       console.error('Failed to parse incoming WebSocket message', e);
     }
-  });
-
-  const { sendMessage, isConnected } = useWebSocket(chat.id, (event) => {
-    queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
-  });
+  }, [chat.id, queryClient]);
+  
+  const { sendMessage, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -291,4 +273,5 @@ export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   );
 }
 
+export default React.memo(ChatWindow);
     

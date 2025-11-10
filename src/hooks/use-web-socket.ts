@@ -44,7 +44,7 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
       const token = localStorage.getItem("access_token");
       if (!token) {
         console.error("No auth token found for WebSocket connection.");
-        if(isComponentMounted) {
+        if(isComponentMounted && !reconnectTimeoutRef.current) {
             reconnectTimeoutRef.current = setTimeout(connect, 5000);
         }
         return;
@@ -84,6 +84,7 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
       socket.onerror = (error) => {
         if (!isComponentMounted) return;
         console.error('WebSocket error:', error);
+        // The onclose event will be fired next, which will handle reconnection.
       };
     };
 
@@ -104,5 +105,3 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
 
   return { sendMessage, isConnected };
 }
-
-    
