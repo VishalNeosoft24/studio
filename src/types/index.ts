@@ -39,15 +39,11 @@ export type ApiMessage = {
 export type Message = {
   id: string;
   sender: 'me' | 'contact'; // Simplified for UI purposes
-  type: 'text' | 'image' | 'document' | 'contact' | 'poll' | 'audio' | 'location' | 'event';
+  type: 'text' | 'image';
   text: string;
   imageUrl?: string;
-  document?: { name: string; size: string };
-  contactInfo?: { name: string; avatarUrl: string };
-  poll?: { question: string; options: string[] };
-  audio?: { name: string, duration: string };
-  location?: { address: string };
-  event?: { title: string, dateTime: Date };
   timestamp: Date; // Date object for easier formatting
   status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
 };
+
+    

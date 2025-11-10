@@ -106,3 +106,5 @@ export default function CameraViewDialog({ open, onOpenChange, onCapture }: Came
     </Dialog>
   );
 }
+
+    

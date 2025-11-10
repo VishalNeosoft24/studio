@@ -34,26 +34,22 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
   useEffect(() => {
     if (!chatId) return;
     
-    if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-    }
-
     let isComponentMounted = true;
 
     const connect = () => {
-      if (!isComponentMounted) return;
+      if (!isComponentMounted || (ws.current && ws.current.readyState === WebSocket.OPEN)) {
+        return;
+      }
       
       const token = localStorage.getItem("access_token");
       if (!token) {
         console.error("No auth token found for WebSocket connection.");
-        // Optional: schedule a reconnect attempt in case token appears later
         if(isComponentMounted) {
             reconnectTimeoutRef.current = setTimeout(connect, 5000);
         }
         return;
       }
-
-      // Important Fix: Added a trailing slash to match Django's URL pattern
+      
       const socketUrl = `${WS_BASE_URL}/chat/${chatId}/?token=${token}`;
       console.log("Attempting to connect to WebSocket:", socketUrl);
       
@@ -64,9 +60,9 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         if (!isComponentMounted) return;
         console.log('✅ WebSocket connection established for chat', chatId);
         setIsConnected(true);
-        // Clear any previous reconnect timeout
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
         }
       };
 
@@ -80,8 +76,7 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         console.log('❌ WebSocket connection closed:', event.code, event.reason);
         setIsConnected(false);
         ws.current = null;
-        // Reconnect after 3 seconds
-        if(isComponentMounted) {
+        if(isComponentMounted && !reconnectTimeoutRef.current) {
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
       };
@@ -89,7 +84,6 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
       socket.onerror = (error) => {
         if (!isComponentMounted) return;
         console.error('WebSocket error:', error);
-        // The onclose event will be fired next, which will handle reconnection.
       };
     };
 
@@ -101,7 +95,6 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (ws.current) {
-        // Prevent onclose from triggering reconnect
         ws.current.onclose = null; 
         ws.current.close();
         console.log("WebSocket connection closed on component unmount.");
@@ -111,3 +104,5 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
 
   return { sendMessage, isConnected };
 }
+
+    

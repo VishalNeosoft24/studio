@@ -123,3 +123,5 @@ export async function register(username: string, password: string): Promise<User
 
     throw new Error('Registration failed (unexpected response)');
 }
+
+    

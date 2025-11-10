@@ -10,18 +10,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { SendHorizonal, Check, CheckCheck, Paperclip, Smile, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, FileText, ImageIcon as ImageIconLucide, Camera, User, Vote, AlertTriangle, X, Search, Music, MapPin, CalendarPlus, Timer, Wallpaper, Download, SquarePlus, Loader2 } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
-import CameraViewDialog from './camera-view-dialog';
-import { format, isToday, isYesterday, isSameDay, parseISO } from 'date-fns';
-import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMessages, getCurrentUserId } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
+import MessageInput from './message-input';
 
 
 const DateSeparator = ({ date }: { date: Date }) => {
@@ -47,67 +45,53 @@ interface ChatWindowProps {
   onCloseChat: () => void;
 }
 
+const transformApiMessage = (msg: any): Message => {
+    const senderId = msg?.sender?.id ?? msg?.sender_id;
+    const content = msg?.content ?? msg?.message;
+    const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
+  
+    return {
+      id: msg?.id?.toString() || `temp-${Date.now()}`,
+      sender: senderId === getCurrentUserId() ? 'me' : 'contact',
+      type: msg?.message_type || 'text',
+      text: content || '',
+      timestamp: timestamp,
+      status: senderId === getCurrentUserId() ? 'read' : undefined,
+    };
+  };
+
 export default function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [newMessage, setNewMessage] = useState('');
-  const [imageToSend, setImageToSend] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   
   const [isContactInfoOpen, setContactInfoOpen] = useState(false);
-  const [isCameraOpen, setCameraOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
   const [isMuted, setIsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-const transformApiMessage = (msg: any): Message => {
-  const senderId = msg?.sender?.id ?? msg?.sender_id;
-  const content = msg?.content ?? msg?.message;
-  const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
-
-  return {
-    id: msg?.id?.toString() || `temp-${Date.now()}`,
-    sender: senderId === currentUserId ? 'me' : 'contact',
-    type: msg?.message_type || 'text',
-    text: content || '',
-    timestamp: timestamp,
-    status: senderId === currentUserId ? 'read' : undefined,
-  };
-};
-
-
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
       select: (apiMessages) => apiMessages.map(transformApiMessage).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
-      staleTime: Infinity,
+      staleTime: 5000,
   });
 
-  const { sendMessage, isConnected } = useWebSocket(chat.id, (messageEvent) => {
+  useWebSocket(chat.id, (messageEvent) => {
     try {
       const data = JSON.parse(messageEvent.data);
       console.log("📩 WS received:", data);
 
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        const newUiMessage = transformApiMessage(data.message);
-        
-        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
-            // Avoid adding duplicates
-            if (oldMessages.some(m => m.id === newUiMessage.id)) {
-                return oldMessages;
-            }
-            const newMessages = [...oldMessages, newUiMessage];
-            return newMessages.sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime());
-        });
-
+        // Invalidate the query to trigger a refetch, which will include the new message
+        queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
       } else if (data.type === 'delivery_status') {
         queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
           oldMessages.map(m =>
@@ -116,14 +100,15 @@ const transformApiMessage = (msg: any): Message => {
               : m
           )
         );
-      } else {
-        console.warn('Unhandled WebSocket event type:', data.type);
       }
     } catch (e) {
       console.error('Failed to parse incoming WebSocket message', e);
     }
   });
 
+  const { sendMessage, isConnected } = useWebSocket(chat.id, (event) => {
+    queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
+  });
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -137,54 +122,6 @@ const transformApiMessage = (msg: any): Message => {
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
-  };
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newMessage.trim() === '' || !isConnected) return;
-
-    const success = sendMessage(newMessage);
-
-    if (!success) {
-      toast({
-        variant: 'destructive',
-        title: 'Failed to send message',
-        description: 'WebSocket is not connected.',
-      });
-    }
-
-    setNewMessage('');
-  };
-  
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-              setImageToSend(event.target?.result as string);
-          };
-          reader.readAsDataURL(file);
-      }
-  };
-  
-  const sendMockMessage = (type: Message['type'], data: Partial<Message>) => {
-      showToast(`Sending ${type}...`, 'This part is not connected to the backend yet.');
-  };
-  
-  const handleSendDocument = () => sendMockMessage('document', { document: { name: 'project-brief.pdf', size: '1.2 MB' }});
-  const handleShareContact = () => sendMockMessage('contact', { contactInfo: { name: 'Charlie', avatarUrl: 'https://picsum.photos/id/103/50/50' }});
-  const handleSendPoll = () => sendMockMessage('poll', { poll: { question: 'Where for lunch?', options: ['Italian', 'Sushi'] }});
-  const handleSendAudio = () => sendMockMessage('audio', { audio: { name: 'voice.mp3', duration: '0:34' }});
-  const handleSendLocation = () => sendMockMessage('location', { location: { address: '123 Main St' }});
-  const handleSendEvent = () => sendMockMessage('event', { event: { title: 'Team Meeting', dateTime: new Date() }});
-
-  const handleCapture = (dataUrl: string) => {
-      setImageToSend(dataUrl);
-      showToast('Image captured!', 'Sending image is not yet implemented.');
-  };
-
-  const handleEmojiSelect = (emoji: EmojiClickData) => {
-    setNewMessage(prevInput => prevInput + emoji.emoji);
   };
   
   const toggleMute = () => {
@@ -211,7 +148,6 @@ const transformApiMessage = (msg: any): Message => {
   return (
     <>
     <ContactInfoSheet participant={otherParticipantSafe} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
-    <CameraViewDialog open={isCameraOpen} onOpenChange={setCameraOpen} onCapture={handleCapture} />
 
     <Card className="flex flex-col h-full w-full rounded-none border-none shadow-none bg-transparent">
       <CardHeader className="p-3 border-b bg-secondary flex-row items-center justify-between">
@@ -322,73 +258,6 @@ const transformApiMessage = (msg: any): Message => {
                           <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md"/>
                         </div>
                     )}
-                    {msg.type === 'document' && msg.document && (
-                        <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 mb-1">
-                          <FileText className="h-10 w-10 mr-3 text-primary" />
-                          <div>
-                            <p className="font-medium truncate">{msg.document.name}</p>
-                            <p className="text-xs text-muted-foreground">{msg.document.size}</p>
-                          </div>
-                        </div>
-                      )}
-                      {msg.type === 'contact' && msg.contactInfo && (
-                        <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 w-64 mb-1">
-                            <Avatar className="h-10 w-10 mr-3">
-                              <AvatarImage src={msg.contactInfo.avatarUrl} alt={msg.contactInfo.name} />
-                              <AvatarFallback>{msg.contactInfo.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className='flex-1 overflow-hidden'>
-                                <p className="font-medium truncate">{msg.contactInfo.name}</p>
-                                <p className='text-xs text-muted-foreground'>Contact</p>
-                            </div>
-                            <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Contact')}>View</Button>
-                        </div>
-                      )}
-                      {msg.type === 'poll' && msg.poll && (
-                        <div className="space-y-2 w-64 mb-1">
-                            <p className="font-semibold">{msg.poll.question}</p>
-                            <div className="space-y-2">
-                              {msg.poll.options.map((option, i) => (
-                                <Button key={i} variant="outline" className="w-full justify-start" onClick={() => toast({title: `Voted for "${option}"`})}>{option}</Button>
-                              ))}
-                            </div>
-                            <p className="text-xs text-muted-foreground text-right">2 votes</p>
-                        </div>
-                      )}
-                       {msg.type === 'audio' && msg.audio && (
-                        <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 w-64 mb-1">
-                            <div className="flex items-center justify-center h-10 w-10 mr-3 bg-primary/20 rounded-full">
-                                <Music className="h-5 w-5 text-primary" />
-                            </div>
-                            <div className='flex-1 overflow-hidden'>
-                                <p className="font-medium truncate">{msg.audio.name}</p>
-                                <p className="text-xs text-muted-foreground">{msg.audio.duration}</p>
-                            </div>
-                        </div>
-                      )}
-                      {msg.type === 'location' && msg.location && (
-                          <div className="relative w-64 h-32 mb-1 group">
-                              <Image src={`https://placehold.co/400x200.png`} layout="fill" objectFit="cover" className="rounded-md" alt="Location Map" data-ai-hint="map location" />
-                              <div className="absolute inset-0 bg-black/40 flex flex-col justify-end p-2 rounded-md">
-                                  <div className="flex items-center text-white">
-                                      <MapPin className="h-4 w-4 mr-1"/>
-                                      <p className="text-sm font-medium truncate">{msg.location.address}</p>
-                                  </div>
-                              </div>
-                          </div>
-                      )}
-                      {msg.type === 'event' && msg.event && (
-                          <div className="flex items-center p-2 rounded-md bg-black/5 dark:bg-white/5 w-64 mb-1">
-                              <div className="flex items-center justify-center h-10 w-10 mr-3">
-                                  <CalendarPlus className="h-6 w-6 text-primary" />
-                              </div>
-                              <div className='flex-1 overflow-hidden'>
-                                  <p className="font-semibold truncate">{msg.event.title}</p>
-                                  <p className="text-xs text-muted-foreground">{format(msg.event.dateTime, 'PPp')}</p>
-                              </div>
-                              <Button variant="outline" size="sm" className='ml-2' onClick={() => showToast('View Event')}>View</Button>
-                          </div>
-                      )}
                     {msg.text && <p className="text-sm">{msg.text}</p>}
                     <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-xs text-muted-foreground">
@@ -402,15 +271,6 @@ const transformApiMessage = (msg: any): Message => {
             )})}
             </div>
         </ScrollArea>
-        {imageToSend && (
-            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-11/12 p-2 bg-background/80 backdrop-blur-sm rounded-lg shadow-lg border">
-                <div className="relative">
-                    <p className="text-sm font-medium mb-2">Image Preview</p>
-                    <Image src={imageToSend} alt="Image preview" width={100} height={100} className="rounded-md" />
-                    <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-6 w-6" onClick={() => setImageToSend(null)}><X className="h-4 w-4"/></Button>
-                </div>
-            </div>
-        )}
       </CardContent>
 
       {isBlocked ? (
@@ -424,56 +284,11 @@ const transformApiMessage = (msg: any): Message => {
           </Alert>
         </CardFooter>
       ) : (
-      <CardFooter className="p-3 border-t bg-secondary">
-        <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                  <Smile className="h-5 w-5" /><span className="sr-only">Add emoji</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 border-0" side="top" align="start">
-              <Picker 
-                onEmojiClick={handleEmojiSelect}
-                autoFocusSearch={false}
-                emojiStyle={EmojiStyle.NATIVE}
-                theme="auto"
-              />
-            </PopoverContent>
-          </Popover>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0"><Paperclip className="h-5 w-5" /><span className="sr-only">Attach file</span></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={handleSendDocument}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}><ImageIconLucide className="mr-2 h-4 w-4" /><span>Gallery</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCameraOpen(true)}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSendAudio}><Music className="mr-2 h-4 w-4" /><span>Audio</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSendLocation}><MapPin className="mr-2 h-4 w-4" /><span>Location</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={handleShareContact}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSendPoll}><Vote className="mr-2 h-4 w-4" /><span>Poll</span></DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSendEvent}><CalendarPlus className="mr-2 h-4 w-4" /><span>Event</span></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Input
-            type="text"
-            placeholder="Type a message"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 bg-background border-input focus-visible:ring-primary"
-            autoComplete="off"
-            disabled={!isConnected || !!imageToSend}
-          />
-          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
-          <Button type="submit" size="icon" className="bg-primary hover:bg-primary/90" disabled={!isConnected || !newMessage.trim()}>
-            <SendHorizonal className="h-5 w-5" />
-            <span className="sr-only">Send message</span>
-          </Button>
-        </form>
-      </CardFooter>
+        <MessageInput onSendMessage={sendMessage} isConnected={isConnected} />
       )}
     </Card>
     </>
   );
 }
+
+    
