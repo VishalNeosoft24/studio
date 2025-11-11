@@ -52,14 +52,14 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     enabled: open, // Only fetch when the sheet is open
   });
 
-  const [name, setName] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [about, setAbout] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setName(user.username);
+      setDisplayName(user.display_name || user.username);
       setAbout(user.about_status || 'Hey there! I am using Chatterbox.');
     }
   }, [user]);
@@ -68,6 +68,8 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     mutationFn: updateProfile,
     onSuccess: (data) => {
       queryClient.setQueryData(['profile'], data);
+      queryClient.invalidateQueries({ queryKey: ['chats'] });
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
       toast({ title: 'Profile Updated', description: 'Your profile has been successfully updated.' });
     },
     onError: (error) => {
@@ -77,10 +79,10 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     },
   });
 
-  const handleUpdate = (field: 'username' | 'about_status', value: string) => {
-    if (field === 'username' && value.trim() === '') {
+  const handleUpdate = (field: 'display_name' | 'about_status', value: string) => {
+    if (field === 'display_name' && value.trim() === '') {
         toast({ variant: 'destructive', title: 'Invalid Name', description: 'Name cannot be empty.'});
-        setName(user?.username || '');
+        setDisplayName(user?.display_name || user?.username || '');
         return;
     }
     updateProfileMutation.mutate({ [field]: value });
@@ -89,7 +91,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   const getAvatarFallback = (name?: string) => {
       if (!name) return 'U';
       const parts = name.split(' ');
-      if (parts.length > 1) {
+      if (parts.length > 1 && parts[1]) {
           return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
       }
       return name.substring(0, 2).toUpperCase();
@@ -109,7 +111,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
             <div className="relative group cursor-pointer" onClick={() => toast({ title: 'Feature not implemented' })}>
                 <Avatar className="h-40 w-40">
                 <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
-                <AvatarFallback>{getAvatarFallback(user?.username)}</AvatarFallback>
+                <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
                 </Avatar>
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
                 <Camera className="h-8 w-8 text-white" />
@@ -125,25 +127,25 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                 {isEditingName ? (
                     <>
                     <Input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
                         className="h-9"
                         autoFocus
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                                handleUpdate('username', name);
+                                handleUpdate('display_name', displayName);
                                 setIsEditingName(false);
                             }
                             if (e.key === 'Escape') setIsEditingName(false);
                         }}
                     />
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdate('username', name); setIsEditingName(false); }}>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdate('display_name', displayName); setIsEditingName(false); }}>
                         <Check className="h-5 w-5" />
                     </Button>
                     </>
                 ) : (
                     <>
-                    <p className="flex-1 py-1.5">{name}</p>
+                    <p className="flex-1 py-1.5">{displayName}</p>
                     <Button variant="ghost" size="icon" onClick={() => setIsEditingName(true)}>
                         <Pencil className="h-5 w-5 text-muted-foreground" />
                     </Button>

@@ -4,6 +4,7 @@
 export type User = {
     id: string | number;
     username: string;
+    display_name?: string | null;
     email?: string;
     profile_picture_url?: string | null;
     about_status?: string | null;
@@ -84,7 +85,7 @@ export type ApiContact = {
     name: string; // Name from phone contacts
     is_registered: boolean;
     is_blocked: boolean;
-    is_muted: boolean;
+is_muted: boolean;
     created_at: string;
 };
 

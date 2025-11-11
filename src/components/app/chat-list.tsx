@@ -74,7 +74,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
   const getAvatarFallback = (name?: string) => {
       if (!name) return 'U';
       const parts = name.split(' ');
-      if (parts.length > 1) {
+      if (parts.length > 1 && parts[1]) {
           return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
       }
       return name.substring(0, 2).toUpperCase();
@@ -85,12 +85,12 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
       <ProfileSheet open={isProfileSheetOpen} onOpenChange={setProfileSheetOpen} />
       <div className="p-3 border-b bg-secondary flex-row items-center justify-between flex">
           <button onClick={() => setProfileSheetOpen(true)} className="rounded-full">
-            {isLoadingUser ? (
+            {isLoadingUser || !user ? (
                 <Skeleton className="h-10 w-10 rounded-full" />
             ) : (
                 <Avatar className="h-10 w-10">
-                    <AvatarImage src={user?.profile_picture_url || ""} alt={user?.username} />
-                    <AvatarFallback>{getAvatarFallback(user?.username)}</AvatarFallback>
+                    <AvatarImage src={user.profile_picture_url || ""} alt={user.username} />
+                    <AvatarFallback>{getAvatarFallback(user.display_name || user.username)}</AvatarFallback>
                 </Avatar>
             )}
           </button>
