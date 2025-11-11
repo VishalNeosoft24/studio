@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { Chat } from '@/types';
 import ChatList from '@/components/app/chat-list';
 import ChatWindow from '@/components/app/chat-window';
@@ -32,23 +33,32 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // The URL is the single source of truth for the selected chat.
-  const selectedChatId = searchParams.get('chatId');
+  // Local state to reliably track the selected chat ID
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+
+  // Effect to synchronize local state with URL search params
+  useEffect(() => {
+    const chatIdFromUrl = searchParams.get('chatId');
+    if (chatIdFromUrl) {
+      setSelectedChatId(chatIdFromUrl);
+    }
+  }, [searchParams]);
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
     queryFn: getChats,
   });
   
-  // When a chat is selected from the list, we only need to update the URL.
-  // The component will re-render with the new selectedChatId from the URL.
   const handleSelectChat = (id: string) => {
+    // Update the local state and the URL
+    setSelectedChatId(id);
     router.push(`/chat?chatId=${id}`, { scroll: false });
   };
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
 
   const handleCloseChat = () => {
+    setSelectedChatId(null);
     router.push('/chat', { scroll: false });
   };
 
@@ -81,8 +91,7 @@ export default function ChatPage() {
               onCloseChat={handleCloseChat}
             />
           ) : (
-            // If there's a chatId in the URL but the chat isn't found yet (e.g., loading), show a skeleton.
-            // This is important for when navigating from the contacts page.
+            // If there's a chatId but the chat isn't found yet (e.g., loading), show a skeleton.
             <div className="flex flex-col h-full w-full items-center justify-center bg-transparent">
               <div className="p-3 border-b bg-secondary flex-row items-center justify-between w-full">
                 <div className="flex items-center">
@@ -102,7 +111,7 @@ export default function ChatPage() {
             </div>
           )
         ) : (
-          // If there's no chatId in the URL, show the placeholder.
+          // If there's no chatId, show the placeholder.
           <ChatPlaceholder />
         )}
       </div>
