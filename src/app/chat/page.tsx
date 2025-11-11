@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -54,10 +53,11 @@ export default function ChatPage() {
 
   // Automatically select the first chat if no chat is selected via URL
   useEffect(() => {
-    if (!selectedChatId && chats && chats.length > 0) {
+    // Only select the first chat if no chat ID is in the URL and chats are loaded.
+    if (!searchParams.get('chatId') && chats && chats.length > 0) {
       handleSelectChat(chats[0].id);
     }
-  }, [chats, selectedChatId]); // handleSelectChat is stable
+  }, [chats, searchParams]); // Depends on chats and searchParams
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
 
@@ -94,6 +94,12 @@ export default function ChatPage() {
             onCloseChat={handleCloseChat}
           />
         ) : (
+          // Show a loading indicator if we are expecting a chat but it hasn't loaded yet
+          (isLoading || selectedChatId) && !isError ? 
+          <div className="flex items-center justify-center h-full">
+            <Skeleton className="h-24 w-24 rounded-full" />
+          </div>
+          :
           <ChatPlaceholder />
         )}
       </div>
