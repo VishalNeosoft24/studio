@@ -1,12 +1,14 @@
 
 
-
 // For the UI, simplified
 export type User = {
-    id: string;
+    id: string | number;
     username: string;
-    avatarUrl?: string;
-    about?: string;
+    email?: string;
+    profile_picture_url?: string | null;
+    about_status?: string | null;
+    avatarUrl?: string; // a bit redundant, can be cleaned up later
+    about?: string; // a bit redundant
 }
 
 export type RegisterPayload = {

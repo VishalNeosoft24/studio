@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Chat } from "@/types";
+import type { Chat, User } from "@/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -12,8 +12,10 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { logout, getCurrentUserId } from "@/lib/api";
+import { logout, getCurrentUserId, getProfile } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { useQuery } from '@tanstack/react-query';
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 type ChatListProps = {
@@ -28,6 +30,11 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
   const currentUserId = getCurrentUserId();
+
+  const { data: user, isLoading: isLoadingUser } = useQuery<User>({
+      queryKey: ['profile'],
+      queryFn: getProfile,
+  });
 
   const showToast = (title: string) => {
     toast({ title: title, description: 'This feature is not yet implemented.' });
@@ -64,15 +71,28 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
     };
   };
 
+  const getAvatarFallback = (name?: string) => {
+      if (!name) return 'U';
+      const parts = name.split(' ');
+      if (parts.length > 1) {
+          return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return name.substring(0, 2).toUpperCase();
+  }
+
   return (
     <>
       <ProfileSheet open={isProfileSheetOpen} onOpenChange={setProfileSheetOpen} />
       <div className="p-3 border-b bg-secondary flex-row items-center justify-between flex">
           <button onClick={() => setProfileSheetOpen(true)} className="rounded-full">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src="https://picsum.photos/id/42/50/50" alt="My Avatar" data-ai-hint="profile person" />
-              <AvatarFallback>YOU</AvatarFallback>
-            </Avatar>
+            {isLoadingUser ? (
+                <Skeleton className="h-10 w-10 rounded-full" />
+            ) : (
+                <Avatar className="h-10 w-10">
+                    <AvatarImage src={user?.profile_picture_url || ""} alt={user?.username} />
+                    <AvatarFallback>{getAvatarFallback(user?.username)}</AvatarFallback>
+                </Avatar>
+            )}
           </button>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Communities')}>
