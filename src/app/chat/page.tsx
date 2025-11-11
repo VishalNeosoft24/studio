@@ -33,36 +33,23 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(() => searchParams.get('chatId'));
+  // The URL is the single source of truth for the selected chat
+  const selectedChatId = searchParams.get('chatId');
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
     queryFn: getChats,
   });
-
-  // Update selected chat when URL param changes
-  useEffect(() => {
-    setSelectedChatId(searchParams.get('chatId'));
-  }, [searchParams]);
-
-  // Update URL when chat is selected from the list
+  
+  // When a chat is selected from the list, we only need to update the URL.
+  // The component will re-render with the new selectedChatId from the URL.
   const handleSelectChat = (id: string) => {
-    setSelectedChatId(id);
     router.push(`/chat?chatId=${id}`, { scroll: false });
   };
-
-  // Automatically select the first chat if no chat is selected via URL
-  useEffect(() => {
-    // Only select the first chat if no chat ID is in the URL and chats are loaded.
-    if (!searchParams.get('chatId') && chats && chats.length > 0) {
-      handleSelectChat(chats[0].id);
-    }
-  }, [chats, searchParams]); // Depends on chats and searchParams
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
 
   const handleCloseChat = () => {
-    setSelectedChatId(null);
     router.push('/chat', { scroll: false });
   };
 
@@ -87,19 +74,21 @@ export default function ChatPage() {
 
       {/* Right section - Chat window */}
       <div className="flex-1 flex flex-col">
-        {selectedChat ? (
-          <ChatWindow
-            key={selectedChat.id}
-            chat={selectedChat}
-            onCloseChat={handleCloseChat}
-          />
+        {selectedChatId ? (
+          selectedChat ? (
+            <ChatWindow
+              key={selectedChat.id}
+              chat={selectedChat}
+              onCloseChat={handleCloseChat}
+            />
+          ) : (
+            // If there's a chatId in the URL but the chat isn't found yet (e.g., loading), show a skeleton.
+            <div className="flex items-center justify-center h-full">
+              <Skeleton className="h-24 w-24 rounded-full" />
+            </div>
+          )
         ) : (
-          // Show a loading indicator if we are expecting a chat but it hasn't loaded yet
-          (isLoading || selectedChatId) && !isError ? 
-          <div className="flex items-center justify-center h-full">
-            <Skeleton className="h-24 w-24 rounded-full" />
-          </div>
-          :
+          // If there's no chatId in the URL, show the placeholder.
           <ChatPlaceholder />
         )}
       </div>
