@@ -104,6 +104,18 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
       </div>
       <ScrollArea className="flex-1">
         <div className="p-0">
+          <button
+              onClick={() => setAddContactOpen(true)}
+              className="flex items-center w-full p-3 hover:bg-secondary transition-colors text-left"
+            >
+              <Avatar className="h-10 w-10 mr-3 relative bg-primary text-primary-foreground flex items-center justify-center">
+                <UserPlus className="h-5 w-5" />
+              </Avatar>
+              <div className="flex-1 overflow-hidden">
+                <h3 className="font-medium truncate text-primary">New contact</h3>
+              </div>
+          </button>
+
           {registeredContacts.length > 0 && (
             <>
               <div className="p-4">
