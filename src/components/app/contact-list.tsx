@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import ProfileSheet from './profile-sheet';
 import { logout } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import AddContactDialog from './add-contact-dialog';
 
 interface ContactListProps {
   contacts: Contact[];
@@ -25,6 +26,7 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
+  const [isAddContactOpen, setAddContactOpen] = useState(false);
 
   const showToast = (title: string, description?: string) => {
     toast({ title: title, description: description || 'This feature is not yet implemented.' });
@@ -47,6 +49,8 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
   return (
     <>
       <ProfileSheet open={isProfileSheetOpen} onOpenChange={setProfileSheetOpen} />
+      <AddContactDialog open={isAddContactOpen} onOpenChange={setAddContactOpen} />
+      
       <div className="p-3 border-b bg-secondary flex-row items-center justify-between flex">
           <button onClick={() => setProfileSheetOpen(true)} className="rounded-full">
             <Avatar className="h-10 w-10">
@@ -75,6 +79,7 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setAddContactOpen(true)}>New contact</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => showToast('New group')}>New group</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => showToast('New community')}>New community</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => showToast('Starred messages')}>Starred messages</DropdownMenuItem>

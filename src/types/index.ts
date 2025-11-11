@@ -1,5 +1,6 @@
 
 
+
 // For the UI, simplified
 export type User = {
     id: string;
@@ -35,6 +36,12 @@ export type CreateChatPayload = {
     chat_type: 'private' | 'group';
     participant_ids: number[];
 }
+
+export type AddContactPayload = {
+    name: string;
+    phone_number: string;
+};
+
 
 // Represents the raw message from your DRF API (via WebSocket or REST)
 export type ApiMessage = {

@@ -1,6 +1,7 @@
 
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload } from '@/types';
+
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -102,6 +103,13 @@ export async function getContacts(): Promise<Contact[]> {
                 isRegistered: false,
             };
         }
+    });
+}
+
+export async function addContact(payload: AddContactPayload): Promise<ApiContact> {
+    return await apiFetch('/contacts/add/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
     });
 }
 
