@@ -81,14 +81,28 @@ export async function createChat(payload: CreateChatPayload): Promise<Chat> {
 export async function getContacts(): Promise<Contact[]> {
     const apiContacts: ApiContact[] = await apiFetch("/contacts/");
     
-    // Transform the nested API response into the flat structure our UI expects
-    return apiContacts.map(item => ({
-        id: item.contact.id.toString(),
-        name: item.contact.username,
-        avatarUrl: item.contact.profile_picture_url,
-        isMuted: item.is_muted,
-        about: item.contact.about_status
-    }));
+    // Transform the API response into the flat structure our UI expects
+    return apiContacts.map(item => {
+        if (item.is_registered && item.contact) {
+            return {
+                id: item.contact.id.toString(),
+                name: item.contact.username,
+                avatarUrl: item.contact.profile_picture_url,
+                isMuted: item.is_muted,
+                about: item.contact.about_status,
+                isRegistered: true,
+            };
+        } else {
+            return {
+                id: `phone-${item.phone_number}`, // Use phone number for a unique ID for non-registered
+                name: item.name, // Use the name from phone contacts
+                avatarUrl: null,
+                isMuted: false,
+                about: `Invite ${item.name} to Chatterbox`,
+                isRegistered: false,
+            };
+        }
+    });
 }
 
 

@@ -70,7 +70,10 @@ export type ApiContact = {
         username: string;
         profile_picture_url: string | null;
         about_status: string | null;
-    };
+    } | null; // Can be null if not registered
+    phone_number: string;
+    name: string; // Name from phone contacts
+    is_registered: boolean;
     is_blocked: boolean;
     is_muted: boolean;
     created_at: string;
@@ -78,10 +81,11 @@ export type ApiContact = {
 
 // Represents a contact transformed for the UI
 export type Contact = {
-    id: string; // The contact's user ID
+    id: string; // The contact's user ID (if registered) or a temporary ID
     name: string;
     avatarUrl: string | null;
     isMuted: boolean;
     about: string | null;
+    isRegistered: boolean;
 };
     

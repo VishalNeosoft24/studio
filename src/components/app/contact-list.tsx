@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MessageSquarePlus, MoreVertical, Users, CircleDashed, LogOut, Loader2 } from 'lucide-react';
+import { MessageSquarePlus, MoreVertical, Users, CircleDashed, LogOut, Loader2, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import ProfileSheet from './profile-sheet';
@@ -26,8 +26,8 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
 
-  const showToast = (title: string) => {
-    toast({ title: title, description: 'This feature is not yet implemented.' });
+  const showToast = (title: string, description?: string) => {
+    toast({ title: title, description: description || 'This feature is not yet implemented.' });
   };
 
   const handleLogout = () => {
@@ -36,8 +36,12 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
     router.push('/login');
   };
   
-  const filteredContacts = contacts.filter(contact => 
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const registeredContacts = contacts.filter(contact => 
+    contact.isRegistered && contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const unregisteredContacts = contacts.filter(contact => 
+    !contact.isRegistered && contact.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -95,28 +99,55 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
       </div>
       <ScrollArea className="flex-1">
         <div className="p-0">
-          <div className="p-4">
-            <h2 className="text-primary font-semibold text-sm">CONTACTS ON CHATTERBOX</h2>
-          </div>
-          {filteredContacts.map((contact) => (
-            <button
-              key={contact.id}
-              onClick={() => onSelectContact(contact.id)}
-              className="flex items-center w-full p-3 hover:bg-secondary transition-colors text-left"
-              disabled={!!isCreatingChatId}
-              aria-current={isCreatingChatId === contact.id ? 'page' : undefined}
-            >
-              <Avatar className="h-10 w-10 mr-3 relative">
-                <AvatarImage src={contact.avatarUrl || ''} alt={contact.name} />
-                <AvatarFallback>{contact.name.charAt(0).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 overflow-hidden">
-                <h3 className="font-medium truncate">{contact.name}</h3>
-                <p className="text-sm text-muted-foreground truncate">{contact.about || 'Hey there! I am using Chatterbox.'}</p>
+          {registeredContacts.length > 0 && (
+            <>
+              <div className="p-4">
+                <h2 className="text-primary font-semibold text-sm">CONTACTS ON CHATTERBOX</h2>
               </div>
-              {isCreatingChatId === contact.id && <Loader2 className="h-5 w-5 animate-spin" />}
-            </button>
-          ))}
+              {registeredContacts.map((contact) => (
+                <button
+                  key={contact.id}
+                  onClick={() => onSelectContact(contact.id)}
+                  className="flex items-center w-full p-3 hover:bg-secondary transition-colors text-left"
+                  disabled={!!isCreatingChatId}
+                  aria-current={isCreatingChatId === contact.id ? 'page' : undefined}
+                >
+                  <Avatar className="h-10 w-10 mr-3 relative">
+                    <AvatarImage src={contact.avatarUrl || ''} alt={contact.name} />
+                    <AvatarFallback>{contact.name.charAt(0).toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 overflow-hidden">
+                    <h3 className="font-medium truncate">{contact.name}</h3>
+                    <p className="text-sm text-muted-foreground truncate">{contact.about || 'Hey there! I am using Chatterbox.'}</p>
+                  </div>
+                  {isCreatingChatId === contact.id && <Loader2 className="h-5 w-5 animate-spin" />}
+                </button>
+              ))}
+            </>
+          )}
+
+          {unregisteredContacts.length > 0 && (
+            <>
+              <div className="p-4 mt-2">
+                <h2 className="text-primary font-semibold text-sm">INVITE TO CHATTERBOX</h2>
+              </div>
+              {unregisteredContacts.map((contact) => (
+                <div key={contact.id} className="flex items-center w-full p-3 text-left">
+                  <Avatar className="h-10 w-10 mr-3 relative">
+                     <AvatarFallback className="bg-muted-foreground/20 text-foreground">
+                        <UserPlus className="h-5 w-5"/>
+                     </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 overflow-hidden">
+                    <h3 className="font-medium truncate">{contact.name}</h3>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => showToast('Invite functionality is not implemented.')}>
+                    Invite
+                  </Button>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </ScrollArea>
     </>
