@@ -1,7 +1,6 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
 import type { Chat } from '@/types';
 import ChatList from '@/components/app/chat-list';
 import ChatWindow from '@/components/app/chat-window';
@@ -33,7 +32,7 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // The URL is the single source of truth for the selected chat
+  // The URL is the single source of truth for the selected chat.
   const selectedChatId = searchParams.get('chatId');
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
@@ -83,8 +82,23 @@ export default function ChatPage() {
             />
           ) : (
             // If there's a chatId in the URL but the chat isn't found yet (e.g., loading), show a skeleton.
-            <div className="flex items-center justify-center h-full">
-              <Skeleton className="h-24 w-24 rounded-full" />
+            // This is important for when navigating from the contacts page.
+            <div className="flex flex-col h-full w-full items-center justify-center bg-transparent">
+              <div className="p-3 border-b bg-secondary flex-row items-center justify-between w-full">
+                <div className="flex items-center">
+                  <Skeleton className="h-10 w-10 rounded-full mr-3" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex-1 p-4 w-full">
+                <Skeleton className="h-full w-full" />
+              </div>
+              <div className="p-3 border-t bg-secondary w-full">
+                <Skeleton className="h-10 w-full" />
+              </div>
             </div>
           )
         ) : (
