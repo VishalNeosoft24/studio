@@ -217,7 +217,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                     <DropdownMenuTrigger asChild disabled={anyMutationPending}>
                       <div className="relative group cursor-pointer">
                           <Avatar className="h-40 w-40">
-                              <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
+                              <AvatarImage src={user?.profile_picture_url ?? undefined} alt={user?.username} />
                               <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
                           </Avatar>
                           <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">

@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
@@ -63,7 +62,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-  const chatDisplayName = chat.chat_display_name || (chat.chat_type === 'group' ? chat.name : otherParticipant.username);
+  const chatDisplayName = chat.chat_display_name;
   
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
@@ -155,7 +154,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         <>
         <div className="flex items-center">
            <Avatar className="h-10 w-10 mr-3 relative cursor-pointer" onClick={() => setContactInfoOpen(true)}>
-            <AvatarImage src={otherParticipantSafe.profile_picture_url || ''} alt={otherParticipantSafe.username} />
+            <AvatarImage src={otherParticipantSafe.profile_picture_url ?? undefined} alt={otherParticipantSafe.username} />
             <AvatarFallback>{chatDisplayName.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
@@ -280,4 +279,3 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 }
 
 export default React.memo(ChatWindow);
-    

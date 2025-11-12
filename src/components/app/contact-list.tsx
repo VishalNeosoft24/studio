@@ -130,7 +130,7 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
                   aria-current={isCreatingChatId === contact.id ? 'page' : undefined}
                 >
                   <Avatar className="h-10 w-10 mr-3 relative">
-                    <AvatarImage src={contact.avatarUrl || ''} alt={contact.name} />
+                    <AvatarImage src={contact.avatarUrl ?? undefined} alt={contact.name} />
                     <AvatarFallback>{contact.name.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 overflow-hidden">

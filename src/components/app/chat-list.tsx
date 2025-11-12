@@ -55,7 +55,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
     
     return {
       name: chat.chat_display_name,
-      avatarUrl: otherParticipant?.profile_picture_url || '',
+      avatarUrl: otherParticipant?.profile_picture_url,
       fallback: chat.chat_display_name?.[0]?.toUpperCase() || '?',
     };
   };
@@ -78,7 +78,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                 <Skeleton className="h-10 w-10 rounded-full" />
             ) : (
                 <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.profile_picture_url || ""} alt={user.username} />
+                    <AvatarImage src={user.profile_picture_url ?? undefined} alt={user.username} />
                     <AvatarFallback>{getAvatarFallback(user.display_name || user.username)}</AvatarFallback>
                 </Avatar>
             )}
@@ -139,7 +139,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                 aria-current={selectedChatId === chat.id ? 'page' : undefined}
               >
                 <Avatar className="h-10 w-10 mr-3">
-                  <AvatarImage src={avatarUrl} />
+                  <AvatarImage src={avatarUrl ?? undefined} />
                   <AvatarFallback>{fallback}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">

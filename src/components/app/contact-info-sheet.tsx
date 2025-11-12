@@ -46,7 +46,7 @@ export default function ContactInfoSheet({ participant, open, onOpenChange }: Co
         <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col items-center p-6 bg-background">
             <Avatar className="h-40 w-40">
-                <AvatarImage src={participant.profile_picture_url || ''} alt={displayName} />
+                <AvatarImage src={participant.profile_picture_url ?? undefined} alt={displayName} />
                 <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
             <h2 className="text-xl font-semibold mt-4">{displayName}</h2>
