@@ -1,6 +1,7 @@
 
 
 
+
 import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -88,6 +89,12 @@ export async function uploadProfilePicture(file: File): Promise<{ profile_pictur
     return await apiFetch('/auth/upload-profile/', {
         method: 'POST',
         body: formData,
+    });
+}
+
+export async function removeProfilePicture(): Promise<null> {
+    return await apiFetch('/auth/remove-profile-picture/', {
+        method: 'DELETE',
     });
 }
 

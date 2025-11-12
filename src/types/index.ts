@@ -3,13 +3,14 @@
 
 
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
     username: string;
     display_name?: string | null;
     email?: string;
-    phone_number?: string;
+    phone_number?: string | null;
     profile_picture_url?: string | null;
     about_status?: string | null;
     avatarUrl?: string; // a bit redundant, can be cleaned up later
@@ -113,4 +114,3 @@ export type Contact = {
     isRegistered: boolean;
 };
     
-

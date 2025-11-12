@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Pencil, Check, Loader2, X, Copy } from 'lucide-react';
-import { getProfile, updateProfile, uploadProfilePicture } from '@/lib/api';
+import { Camera, Pencil, Check, Loader2, X, Copy, Trash2, Eye, Upload } from 'lucide-react';
+import { getProfile, updateProfile, uploadProfilePicture, removeProfilePicture } from '@/lib/api';
 import type { User, UpdateProfilePayload } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import CameraViewDialog from './camera-view-dialog';
 
 interface ProfileSheetProps {
   open: boolean;
@@ -59,7 +61,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: user, isLoading: isLoadingUser } = useQuery<User>({
+  const { data: user, isLoading: isLoadingUser, isError } = useQuery<User>({
     queryKey: ['profile'],
     queryFn: getProfile,
   });
@@ -68,6 +70,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   const [about, setAbout] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingAbout, setIsEditingAbout] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -75,12 +78,17 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
       setAbout(user.about_status || 'Hey there! I am using Chatterbox.');
     }
   }, [user]);
+  
+  const handleMutationSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['profile'] });
+    queryClient.invalidateQueries({ queryKey: ['chats'] });
+    queryClient.invalidateQueries({ queryKey: ['contacts'] });
+  };
 
   const textUpdateMutation = useMutation({
     mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['profile'], (oldData: User | undefined) => {
-        // Merge old and new data to prevent overwriting fields like profile_picture_url
         return oldData ? { ...oldData, ...updatedUser } : updatedUser;
       });
       toast({ title: 'Profile Updated', description: 'Your profile has been successfully updated.' });
@@ -94,13 +102,22 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   const pictureUploadMutation = useMutation({
     mutationFn: (file: File) => uploadProfilePicture(file),
     onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['chats'] });
-        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        handleMutationSuccess();
         toast({ title: 'Profile Picture Updated' });
     },
     onError: (error) => {
         toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    }
+  });
+
+  const pictureRemoveMutation = useMutation({
+    mutationFn: () => removeProfilePicture(),
+    onSuccess: () => {
+      handleMutationSuccess();
+      toast({ title: "Profile Picture Removed" });
+    },
+    onError: (error) => {
+      toast({ variant: 'destructive', title: 'Removal Failed', description: error.message });
     }
   });
 
@@ -124,6 +141,25 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     }
   };
 
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+      const arr = dataurl.split(',');
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (!mimeMatch) throw new Error("Invalid Data URL");
+      const mime = mimeMatch[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while(n--){
+          u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, {type:mime});
+  }
+
+  const handleCapture = (dataUrl: string) => {
+      const file = dataURLtoFile(dataUrl, `capture-${Date.now()}.png`);
+      pictureUploadMutation.mutate(file);
+  };
+
   const getAvatarFallback = (name?: string) => {
       if (!name) return 'U';
       const parts = name.split(' ');
@@ -139,16 +175,20 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     onOpenChange(false);
   }
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string | null | undefined) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
     toast({
       title: 'Copied!',
       description: `${text} has been copied to your clipboard.`,
     });
   };
+  
+  const anyMutationPending = pictureUploadMutation.isPending || pictureRemoveMutation.isPending;
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
+      <CameraViewDialog open={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={handleCapture} />
       <SheetContent side="left" className="w-[30%] sm:w-[30%] p-0 flex flex-col">
         {isLoadingUser || !user ? (
             <ProfileSkeleton />
@@ -173,22 +213,45 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                       accept="image/png, image/jpeg, image/gif"
                       onChange={handleFileChange}
                   />
-                  <div className="relative group cursor-pointer" onClick={() => !pictureUploadMutation.isPending && fileInputRef.current?.click()}>
-                      <Avatar className="h-40 w-40">
-                          <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
-                          <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                          {pictureUploadMutation.isPending ? (
-                              <Loader2 className="h-8 w-8 text-white animate-spin" />
-                          ) : (
-                              <>
-                                  <Camera className="h-8 w-8 text-white" />
-                                  <span className="text-white text-center text-xs mt-1">CHANGE<br />PROFILE PHOTO</span>
-                              </>
-                          )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild disabled={anyMutationPending}>
+                      <div className="relative group cursor-pointer">
+                          <Avatar className="h-40 w-40">
+                              <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
+                              <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
+                          </Avatar>
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                              {anyMutationPending ? (
+                                  <Loader2 className="h-8 w-8 text-white animate-spin" />
+                              ) : (
+                                  <>
+                                      <Camera className="h-8 w-8 text-white" />
+                                      <span className="text-white text-center text-xs mt-1">CHANGE<br />PROFILE PHOTO</span>
+                                  </>
+                              )}
+                          </div>
                       </div>
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => window.open(user?.profile_picture_url || '', '_blank')} disabled={!user?.profile_picture_url}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        <span>View photo</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setIsCameraOpen(true)}>
+                        <Camera className="mr-2 h-4 w-4" />
+                        <span>Take photo</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        <span>Upload photo</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => pictureRemoveMutation.mutate()} disabled={!user?.profile_picture_url} className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Remove photo</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
               </div>
 
               <div className="px-6 py-4 space-y-6">
@@ -262,12 +325,10 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                     <Label className="text-primary">Phone</Label>
                     <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-muted-foreground">{user.phone_number}</p>
-                        {user.phone_number && (
-                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopy(user.phone_number!)}>
-                               <Copy className="h-4 w-4" />
-                               <span className="sr-only">Copy phone number</span>
-                           </Button>
-                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopy(user.phone_number)}>
+                            <Copy className="h-4 w-4" />
+                            <span className="sr-only">Copy phone number</span>
+                        </Button>
                     </div>
                 </div>
               </div>
@@ -278,5 +339,3 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     </Sheet>
   );
 }
-
-    
