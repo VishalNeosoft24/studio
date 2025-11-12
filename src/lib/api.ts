@@ -86,14 +86,14 @@ export async function uploadProfilePicture(file: File): Promise<{ profile_pictur
     const formData = new FormData();
     formData.append('file', file);
 
-    return await apiFetch('/auth/upload-profile/', {
+    return await apiFetch('/auth/profile-picture/', {
         method: 'POST',
         body: formData,
     });
 }
 
 export async function removeProfilePicture(): Promise<null> {
-    return await apiFetch('/auth/remove-profile-picture/', {
+    return await apiFetch('/auth/profile-picture/', {
         method: 'DELETE',
     });
 }
