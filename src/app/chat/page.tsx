@@ -30,10 +30,7 @@ function ChatListSkeleton() {
 }
 
 export default function ChatPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  
-  const selectedChatId = searchParams.get('chatId');
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
@@ -41,14 +38,13 @@ export default function ChatPage() {
   });
   
   const handleSelectChat = (id: string) => {
-    // Update the URL, which will trigger a re-render
-    router.push(`/chat?chatId=${id}`, { scroll: false });
+    setSelectedChatId(id);
   };
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
 
   const handleCloseChat = () => {
-    router.push('/chat', { scroll: false });
+    setSelectedChatId(null);
   };
 
   return (
@@ -72,33 +68,12 @@ export default function ChatPage() {
 
       {/* Right section - Chat window */}
       <div className="flex-1 flex flex-col">
-        {selectedChatId ? (
-          selectedChat ? (
+        {selectedChatId && selectedChat ? (
             <ChatWindow
               key={selectedChat.id}
               chat={selectedChat}
               onCloseChat={handleCloseChat}
             />
-          ) : (
-            // If there's a chatId but the chat isn't found yet (e.g., loading), show a skeleton.
-            <div className="flex flex-col h-full w-full items-center justify-center bg-transparent">
-              <div className="p-3 border-b bg-secondary flex-row items-center justify-between w-full">
-                <div className="flex items-center">
-                  <Skeleton className="h-10 w-10 rounded-full mr-3" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 p-4 w-full">
-                <Skeleton className="h-full w-full" />
-              </div>
-              <div className="p-3 border-t bg-secondary w-full">
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </div>
-          )
         ) : (
           // If there's no chatId, show the placeholder.
           <ChatPlaceholder />
