@@ -31,6 +31,7 @@ export type Chat = {
     name: string;
     chat_type: 'private' | 'group';
     participants: Participant[];
+    chat_display_name: string;
     created_at: string;
 }
 

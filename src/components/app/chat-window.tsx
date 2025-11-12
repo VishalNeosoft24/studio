@@ -63,9 +63,9 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const currentUserId = getCurrentUserId();
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
-  const chatDisplayName = chat.chat_type === 'private' ? (otherParticipant?.username || chat.name) : chat.name;
+  const chatDisplayName = chat.chat_type === 'private' ? (chat.chat_display_name || otherParticipant.username) : chat.name;
 
-
+  
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),

@@ -58,7 +58,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
     if (chat.chat_type === 'private') {
       const otherParticipant = chat.participants.find(p => p.id !== currentUserId);
       return {
-        name: otherParticipant?.username || 'Unknown User',
+        name: chat.chat_display_name || 'Unknown User',
         avatarUrl: otherParticipant?.profile_picture_url || '',
         fallback: otherParticipant?.username?.[0]?.toUpperCase() || '?',
       };
