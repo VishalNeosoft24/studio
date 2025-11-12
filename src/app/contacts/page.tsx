@@ -51,7 +51,7 @@ export default function ContactsPage() {
         const currentUserId = getCurrentUserId();
         const contactUserId = parseInt(contactId, 10);
         
-        // --- The Core Fix: Check for existing chat first ---
+        // --- Check for existing chat first ---
         const foundChat = existingChats?.find(chat => 
             chat.chat_type === 'private' &&
             chat.participants.length === 2 &&
@@ -64,8 +64,7 @@ export default function ContactsPage() {
             router.push(`/chat?chatId=${foundChat.id}`);
             return;
         }
-        // --- End of fix ---
-
+        
         console.log("No existing chat found, creating a new one...");
         const newChat = await createChat({
             name: '', // Pass an empty name for private chats
@@ -73,7 +72,7 @@ export default function ContactsPage() {
             participant_ids: [currentUserId!, contactUserId],
         });
         
-        // Manually add the new chat to the query cache to avoid a refetch
+        // --- The Core Fix: Manually update the query cache ---
         queryClient.setQueryData(['chats'], (oldData: Chat[] | undefined) => {
             return oldData ? [...oldData, newChat] : [newChat];
         });
