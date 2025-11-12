@@ -132,12 +132,10 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   }
 
   const handleClose = () => {
+    // Reset editing states when closing the sheet
     setIsEditingName(false);
     setIsEditingAbout(false);
-    if(user) {
-        setDisplayName(user.display_name || user.username);
-        setAbout(user.about_status || 'Hey there! I am using Chatterbox.');
-    }
+    // Let useEffect handle resetting text fields based on query data
     onOpenChange(false);
   }
 
