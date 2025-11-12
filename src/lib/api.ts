@@ -1,5 +1,6 @@
 
 
+
 import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -138,12 +139,14 @@ export function transformApiMessage(msg: any): Message {
     const senderId = msg?.sender?.id ?? msg?.sender_id;
     const content = msg?.content ?? msg?.message;
     const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
+    const imageUrl = msg?.image ?? null; // Handle image URL
   
     return {
       id: msg?.id?.toString() || `temp-${Date.now()}`,
       sender: senderId === currentUserId ? 'me' : 'contact',
       type: msg?.message_type || 'text',
       text: content || '',
+      imageUrl: imageUrl, // Add image URL to the transformed message
       timestamp: timestamp,
       status: senderId === currentUserId ? 'read' : undefined, // This is a simplification
     };

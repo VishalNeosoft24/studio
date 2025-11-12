@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
-import { SendHorizonal, Check, CheckCheck, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -78,7 +78,10 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       console.log("📩 WS received:", data);
 
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        queryClient.invalidateQueries({ queryKey: ['messages', chat.id] });
+        // Optimistically update the UI, then invalidate to refetch and confirm
+        const newMessage = transformApiMessage(data.message);
+        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => [...oldMessages, newMessage]);
+        queryClient.invalidateQueries({ queryKey: ['messages', chat.id], exact: true });
       } else if (data.type === 'delivery_status') {
         queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
           oldMessages.map(m =>
@@ -93,7 +96,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     }
   }, [chat.id, queryClient]);
   
-  const { sendMessage, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
+  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -239,11 +242,11 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
                 <div className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`message-bubble ${msg.sender === 'me' ? 'message-bubble-outbound' : 'message-bubble-inbound'}`}>
                     {msg.type === 'image' && msg.imageUrl && (
-                        <div className="relative w-64 h-64 mb-1">
-                          <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md"/>
+                       <div className="relative aspect-square w-64 mb-1 cursor-pointer" onClick={() => window.open(msg.imageUrl || '', '_blank')}>
+                           <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md" />
                         </div>
                     )}
-                    {msg.text && <p className="text-sm">{msg.text}</p>}
+                    {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
                     <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                       <span className="text-xs text-muted-foreground">
                         {format(msg.timestamp, 'p')}
@@ -269,7 +272,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Alert>
         </CardFooter>
       ) : (
-        <MessageInput onSendMessage={sendMessage} isConnected={isConnected} />
+        <MessageInput onSendMessage={sendMessage} onSendImage={sendImage} isConnected={isConnected} />
       )}
     </Card>
     </>

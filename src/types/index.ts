@@ -59,6 +59,7 @@ export type ApiMessage = {
     message_type: 'text' | 'image' | 'file'; // As defined by your backend
     timestamp: string; // ISO 8601 date string
     created_at: string; // Your WS consumer uses this
+    image?: string | null; // URL for the image
 };
 
 
@@ -68,7 +69,7 @@ export type Message = {
   sender: 'me' | 'contact'; // Simplified for UI purposes
   type: 'text' | 'image';
   text: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   timestamp: Date; // Date object for easier formatting
   status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
 };

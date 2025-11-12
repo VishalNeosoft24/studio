@@ -7,6 +7,7 @@ const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 
 type WebSocketHook = {
   sendMessage: (message: string) => boolean;
+  sendImage: (image: string, caption: string) => boolean;
   isConnected: boolean;
 };
 
@@ -27,7 +28,24 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
     });
 
     ws.current.send(payload);
-    console.log("⬆️ WS sent:", payload);
+    console.log("⬆️ WS sent (text):", payload);
+    return true;
+  }, []);
+  
+  const sendImage = useCallback((image: string, caption: string) => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket is not open. Cannot send image.');
+        return false;
+    }
+
+    const payload = JSON.stringify({
+        message_type: "image",
+        image: image, // base64 data URL
+        message: caption,
+    });
+
+    ws.current.send(payload);
+    console.log("⬆️ WS sent (image):", { message_type: "image", message: caption, image: "..." });
     return true;
   }, []);
 
@@ -103,5 +121,5 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
     };
   }, [chatId, onMessage]);
 
-  return { sendMessage, isConnected };
+  return { sendMessage, sendImage, isConnected };
 }
