@@ -135,7 +135,10 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
               <button
                 key={chat.id}
                 onClick={() => onSelectChat(chat.id)}
-                className={`flex items-center w-full p-3 hover:bg-secondary transition-colors text-left ${selectedChatId === chat.id ? 'bg-secondary' : ''}`}
+                className={cn(
+                  'flex items-center w-full p-3 hover:bg-secondary transition-colors text-left',
+                  selectedChatId === chat.id && 'bg-muted hover:bg-muted'
+                )}
                 aria-current={selectedChatId === chat.id ? 'page' : undefined}
               >
                 <Avatar className="h-10 w-10 mr-3">
