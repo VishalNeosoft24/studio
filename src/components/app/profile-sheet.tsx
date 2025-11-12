@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Pencil, Check, Loader2, X } from 'lucide-react';
+import { Camera, Pencil, Check, Loader2, X, Copy } from 'lucide-react';
 import { getProfile, updateProfile, uploadProfilePicture } from '@/lib/api';
 import type { User, UpdateProfilePayload } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -45,6 +45,11 @@ const ProfileSkeleton = () => (
                 <Label className="text-primary">About</Label>
                 <Skeleton className="h-8 w-full mt-2" />
             </div>
+            <Separator />
+             <div>
+                <Label className="text-primary">Phone</Label>
+                <Skeleton className="h-8 w-full mt-2" />
+            </div>
         </div>
     </div>
 );
@@ -75,6 +80,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(['profile'], (oldData: User | undefined) => {
+        // Merge old and new data to prevent overwriting fields like profile_picture_url
         return oldData ? { ...oldData, ...updatedUser } : updatedUser;
       });
       toast({ title: 'Profile Updated', description: 'Your profile has been successfully updated.' });
@@ -132,6 +138,14 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     setIsEditingAbout(false);
     onOpenChange(false);
   }
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: 'Copied!',
+      description: `${text} has been copied to your clipboard.`,
+    });
+  };
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
@@ -243,6 +257,19 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                     )}
                     </div>
                 </div>
+                 <Separator />
+                  <div>
+                    <Label className="text-primary">Phone</Label>
+                    <div className="flex items-center justify-between mt-2">
+                        <p className="text-sm text-muted-foreground">{user.phone_number}</p>
+                        {user.phone_number && (
+                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopy(user.phone_number!)}>
+                               <Copy className="h-4 w-4" />
+                               <span className="sr-only">Copy phone number</span>
+                           </Button>
+                        )}
+                    </div>
+                </div>
               </div>
             </div>
         </>
@@ -251,3 +278,5 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     </Sheet>
   );
 }
+
+    
