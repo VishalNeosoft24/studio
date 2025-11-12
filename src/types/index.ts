@@ -24,6 +24,7 @@ export type Participant = {
     id: number;
     username: string;
     profile_picture_url: string | null;
+    display_name?: string | null;
 }
 
 export type Chat = {

@@ -46,28 +46,17 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
     router.push('/login');
   };
 
-  const filteredChats = chats.filter(chat => {
-    if (chat.chat_type === 'private') {
-      const otherParticipant = chat.participants.find(p => p.id !== currentUserId);
-      return otherParticipant?.username.toLowerCase().includes(searchQuery.toLowerCase());
-    }
-    return chat.name.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const filteredChats = chats.filter(chat => 
+    chat.chat_display_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const getChatDisplayData = (chat: Chat) => {
-    if (chat.chat_type === 'private') {
-      const otherParticipant = chat.participants.find(p => p.id !== currentUserId);
-      return {
-        name: chat.chat_display_name || 'Unknown User',
-        avatarUrl: otherParticipant?.profile_picture_url || '',
-        fallback: otherParticipant?.username?.[0]?.toUpperCase() || '?',
-      };
-    }
-    // For group chats
+    const otherParticipant = chat.participants.find(p => p.id !== currentUserId);
+    
     return {
-      name: chat.name,
-      avatarUrl: "", // Group chats might have their own picture
-      fallback: chat.name?.[0]?.toUpperCase() || '#',
+      name: chat.chat_display_name,
+      avatarUrl: otherParticipant?.profile_picture_url || '',
+      fallback: chat.chat_display_name?.[0]?.toUpperCase() || '?',
     };
   };
 
