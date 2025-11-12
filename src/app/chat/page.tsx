@@ -38,29 +38,27 @@ export default function ChatPage() {
     queryFn: getChats,
   });
 
-  // ✅ FIXED useEffect – handle both early and late chat loading
+  // Effect to handle deep-linking from the contacts page
   useEffect(() => {
     const chatIdFromUrl = searchParams.get('chatId');
-    if (!chatIdFromUrl) return; // nothing to do
+    if (!chatIdFromUrl) return; // Nothing to do if no chatId in URL
 
-    // Run this when chats finish loading
+    // Only proceed if chats are loaded
     if (chats && chats.length > 0) {
       const chatExists = chats.some(c => c.id.toString() === chatIdFromUrl);
       if (chatExists) {
-        console.log('✅ Setting chatId from URL:', chatIdFromUrl);
         setSelectedChatId(chatIdFromUrl);
       } else {
-        console.warn(`❌ Chat with ID "${chatIdFromUrl}" not found in chats`);
+        console.warn(`Chat with ID "${chatIdFromUrl}" not found in chats`);
       }
-      // Clean the URL once we've processed the chatId
+      // Clean the URL to prevent this effect from re-running on subsequent renders
       router.replace('/chat', { scroll: false });
     }
-  }, [searchParams, chats, router]); // router added to dependency array
+  }, [searchParams, chats, router]);
 
   const handleSelectChat = (id: string) => {
     setSelectedChatId(id);
-    // No need to push to URL here as selection is now local state. 
-    // This simplifies logic and avoids unnecessary URL changes when just browsing chats.
+    // No need to push to URL here, selection is handled by local state
   };
 
   const selectedChat = chats?.find(c => c.id.toString() === selectedChatId);
