@@ -57,7 +57,6 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   const { data: user, isLoading: isLoadingUser } = useQuery<User>({
     queryKey: ['profile'],
     queryFn: getProfile,
-    enabled: open,
   });
 
   const [displayName, setDisplayName] = useState('');
@@ -88,11 +87,8 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   
   const pictureUploadMutation = useMutation({
     mutationFn: (file: File) => uploadProfilePicture(file),
-    onSuccess: (data) => {
-        queryClient.setQueryData(['profile'], (oldData: User | undefined) => {
-            if (!oldData) return undefined;
-            return { ...oldData, profile_picture_url: data.profile_picture_url };
-        });
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['chats'] });
         queryClient.invalidateQueries({ queryKey: ['contacts'] });
         toast({ title: 'Profile Picture Updated' });
@@ -132,10 +128,8 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   }
 
   const handleClose = () => {
-    // Reset editing states when closing the sheet
     setIsEditingName(false);
     setIsEditingAbout(false);
-    // Let useEffect handle resetting text fields based on query data
     onOpenChange(false);
   }
 
