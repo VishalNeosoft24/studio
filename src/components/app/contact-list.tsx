@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Contact } from '@/types';
+import type { Contact, User } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,11 @@ import { MessageSquarePlus, MoreVertical, Users, CircleDashed, LogOut, Loader2, 
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import ProfileSheet from './profile-sheet';
-import { logout } from '@/lib/api';
+import { logout, getProfile } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import AddContactDialog from './add-contact-dialog';
+import { useQuery } from '@tanstack/react-query';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ContactListProps {
   contacts: Contact[];
@@ -28,6 +30,11 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
   const [isAddContactOpen, setAddContactOpen] = useState(false);
 
+  const { data: user, isLoading: isLoadingUser } = useQuery<User>({
+      queryKey: ['profile'],
+      queryFn: getProfile,
+  });
+
   const showToast = (title: string, description?: string) => {
     toast({ title: title, description: description || 'This feature is not yet implemented.' });
   };
@@ -38,6 +45,15 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
     router.push('/login');
   };
   
+  const getAvatarFallback = (name?: string) => {
+      if (!name) return 'U';
+      const parts = name.split(' ');
+      if (parts.length > 1 && parts[1]) {
+          return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return name.substring(0, 2).toUpperCase();
+  }
+
   const registeredContacts = contacts.filter(contact => 
     contact.isRegistered && contact.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -53,10 +69,14 @@ export default function ContactList({ contacts, onSelectContact, isCreatingChatI
       
       <div className="p-3 border-b bg-secondary flex-row items-center justify-between flex">
           <button onClick={() => setProfileSheetOpen(true)} className="rounded-full">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src="https://picsum.photos/id/42/50/50" alt="My Avatar" data-ai-hint="profile person" />
-              <AvatarFallback>YOU</AvatarFallback>
-            </Avatar>
+            {isLoadingUser || !user ? (
+                <Skeleton className="h-10 w-10 rounded-full" />
+            ) : (
+                <Avatar className="h-10 w-10">
+                    <AvatarImage src={user.profile_picture_url ?? undefined} alt={user.username} />
+                    <AvatarFallback>{getAvatarFallback(user.display_name || user.username)}</AvatarFallback>
+                </Avatar>
+            )}
           </button>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" onClick={() => showToast('Communities')}>
