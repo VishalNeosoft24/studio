@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Chat } from '@/types';
 import ChatList from '@/components/app/chat-list';
 import ChatWindow from '@/components/app/chat-window';
@@ -29,7 +29,6 @@ function ChatListSkeleton() {
 }
 
 export default function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -38,34 +37,19 @@ export default function ChatPage() {
     queryFn: getChats,
   });
 
-  // Effect to handle deep-linking from the contacts page
-  useEffect(() => {
-    const chatIdFromUrl = searchParams.get('chatId');
-    if (!chatIdFromUrl) return; // Nothing to do if no chatId in URL
-
-    // Only proceed if chats are loaded
-    if (chats && chats.length > 0) {
-      const chatExists = chats.some(c => c.id.toString() === chatIdFromUrl);
-      if (chatExists) {
-        setSelectedChatId(chatIdFromUrl);
-      } else {
-        console.warn(`Chat with ID "${chatIdFromUrl}" not found in chats`);
-      }
-      // Clean the URL to prevent this effect from re-running on subsequent renders
-      router.replace('/chat', { scroll: false });
-    }
-  }, [searchParams, chats, router]);
+  const selectedChatId = searchParams.get('chatId');
 
   const handleSelectChat = (id: string) => {
-    setSelectedChatId(id);
-    // No need to push to URL here, selection is handled by local state
+    // The only action is to update the URL. The component will re-render with the new param.
+    router.push(`/chat?chatId=${id}`);
+  };
+
+  const handleCloseChat = () => {
+    // To close, we just remove the chatId from the URL.
+    router.push('/chat');
   };
 
   const selectedChat = chats?.find(c => c.id.toString() === selectedChatId);
-
-  const handleCloseChat = () => {
-    setSelectedChatId(null);
-  };
 
   return (
     <div className="flex h-screen w-screen bg-secondary overflow-hidden">
@@ -88,9 +72,9 @@ export default function ChatPage() {
 
       {/* Right section - Chat window */}
       <div className="flex-1 flex flex-col">
-        {selectedChatId && selectedChat ? (
+        {selectedChat ? (
           <ChatWindow
-            key={selectedChat.id}
+            key={selectedChat.id} // The key is crucial for re-rendering the component on chat change
             chat={selectedChat}
             onCloseChat={handleCloseChat}
           />
