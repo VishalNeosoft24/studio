@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Pencil, Check, Loader2 } from 'lucide-react';
+import { Camera, Pencil, Check, Loader2, X } from 'lucide-react';
 import { getProfile, updateProfile, uploadProfilePicture } from '@/lib/api';
 import type { User, UpdateProfilePayload } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -22,9 +22,16 @@ interface ProfileSheetProps {
 
 const ProfileSkeleton = () => (
     <div className='h-full'>
-        <div className="bg-secondary p-4 flex-row items-center gap-4">
-            <SheetTitle>Profile</SheetTitle>
-        </div>
+        <SheetHeader className="bg-secondary p-4 flex-row items-center gap-4 justify-between">
+            <div className='flex items-center gap-4'>
+                <SheetClose asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <X className="h-5 w-5"/>
+                    </Button>
+                </SheetClose>
+                <SheetTitle>Profile</SheetTitle>
+            </div>
+        </SheetHeader>
         <div className="flex flex-col items-center p-6 bg-background">
             <Skeleton className="h-40 w-40 rounded-full" />
         </div>
@@ -68,7 +75,9 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   const textUpdateMutation = useMutation({
     mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
     onSuccess: (updatedUser) => {
-      queryClient.setQueryData(['profile'], updatedUser);
+      queryClient.setQueryData(['profile'], (oldData: User | undefined) => {
+        return oldData ? { ...oldData, ...updatedUser } : updatedUser;
+      });
       toast({ title: 'Profile Updated', description: 'Your profile has been successfully updated.' });
     },
     onError: (error) => {
@@ -122,108 +131,127 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
       return name.substring(0, 2).toUpperCase();
   }
 
+  const handleClose = () => {
+    setIsEditingName(false);
+    setIsEditingAbout(false);
+    if(user) {
+        setDisplayName(user.display_name || user.username);
+        setAbout(user.about_status || 'Hey there! I am using Chatterbox.');
+    }
+    onOpenChange(false);
+  }
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-[30%] sm:w-[30%] p-0">
+    <Sheet open={open} onOpenChange={handleClose}>
+      <SheetContent side="left" className="w-[30%] sm:w-[30%] p-0 flex flex-col">
         {isLoadingUser || !user ? (
             <ProfileSkeleton />
         ) : (
         <>
-            <SheetHeader className="bg-secondary p-4 flex-row items-center gap-4">
-            <SheetTitle>Profile</SheetTitle>
+            <SheetHeader className="bg-secondary p-4 flex-row items-center gap-4 justify-between">
+              <div className='flex items-center gap-4'>
+                <SheetClose asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <X className="h-5 w-5"/>
+                    </Button>
+                </SheetClose>
+                <SheetTitle>Profile</SheetTitle>
+              </div>
             </SheetHeader>
-            <div className="flex flex-col items-center p-6 bg-background">
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/png, image/jpeg, image/gif"
-                    onChange={handleFileChange}
-                />
-                <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                    <Avatar className="h-40 w-40">
-                        <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
-                        <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
-                    </Avatar>
-                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                        {pictureUploadMutation.isPending ? (
-                            <Loader2 className="h-8 w-8 text-white animate-spin" />
-                        ) : (
-                            <>
-                                <Camera className="h-8 w-8 text-white" />
-                                <span className="text-white text-center text-xs mt-1">CHANGE<br />PROFILE PHOTO</span>
-                            </>
-                        )}
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-col items-center p-6 bg-background">
+                  <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/png, image/jpeg, image/gif"
+                      onChange={handleFileChange}
+                  />
+                  <div className="relative group cursor-pointer" onClick={() => !pictureUploadMutation.isPending && fileInputRef.current?.click()}>
+                      <Avatar className="h-40 w-40">
+                          <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
+                          <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                          {pictureUploadMutation.isPending ? (
+                              <Loader2 className="h-8 w-8 text-white animate-spin" />
+                          ) : (
+                              <>
+                                  <Camera className="h-8 w-8 text-white" />
+                                  <span className="text-white text-center text-xs mt-1">CHANGE<br />PROFILE PHOTO</span>
+                              </>
+                          )}
+                      </div>
+                  </div>
+              </div>
+
+              <div className="px-6 py-4 space-y-6">
+                <div>
+                    <Label className="text-primary">Your name</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                    {isEditingName ? (
+                        <>
+                        <Input
+                            value={displayName}
+                            onChange={(e) => setDisplayName(e.target.value)}
+                            className="h-9"
+                            autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleUpdateText('display_name', displayName);
+                                    setIsEditingName(false);
+                                }
+                                if (e.key === 'Escape') setIsEditingName(false);
+                            }}
+                        />
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdateText('display_name', displayName); setIsEditingName(false); }} disabled={textUpdateMutation.isPending}>
+                            {textUpdateMutation.isPending && textUpdateMutation.variables?.display_name ? <Loader2 className='animate-spin'/> : <Check className="h-5 w-5" />}
+                        </Button>
+                        </>
+                    ) : (
+                        <>
+                        <p className="flex-1 py-1.5">{displayName}</p>
+                        <Button variant="ghost" size="icon" onClick={() => setIsEditingName(true)}>
+                            <Pencil className="h-5 w-5 text-muted-foreground" />
+                        </Button>
+                        </>
+                    )}
                     </div>
                 </div>
-            </div>
-
-            <div className="px-6 py-4 space-y-6">
-            <div>
-                <Label className="text-primary">Your name</Label>
-                <div className="flex items-center gap-2 mt-2">
-                {isEditingName ? (
-                    <>
-                    <Input
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        className="h-9"
-                        autoFocus
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleUpdateText('display_name', displayName);
-                                setIsEditingName(false);
-                            }
-                            if (e.key === 'Escape') setIsEditingName(false);
-                        }}
-                    />
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdateText('display_name', displayName); setIsEditingName(false); }}>
-                        <Check className="h-5 w-5" />
-                    </Button>
-                    </>
-                ) : (
-                    <>
-                    <p className="flex-1 py-1.5">{displayName}</p>
-                    <Button variant="ghost" size="icon" onClick={() => setIsEditingName(true)}>
-                        <Pencil className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                    </>
-                )}
+                <Separator />
+                <div>
+                    <Label className="text-primary">About</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                    {isEditingAbout ? (
+                        <>
+                        <Input
+                            value={about}
+                            onChange={(e) => setAbout(e.target.value)}
+                            className="h-9"
+                            autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleUpdateText('about_status', about);
+                                    setIsEditingAbout(false);
+                                }
+                                if (e.key === 'Escape') setIsEditingAbout(false);
+                            }}
+                        />
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdateText('about_status', about); setIsEditingAbout(false); }} disabled={textUpdateMutation.isPending}>
+                            {textUpdateMutation.isPending && textUpdateMutation.variables?.about_status ? <Loader2 className='animate-spin'/> : <Check className="h-5 w-5" />}
+                        </Button>
+                        </>
+                    ) : (
+                        <>
+                        <p className="flex-1 text-sm py-1.5">{about}</p>
+                        <Button variant="ghost" size="icon" onClick={() => setIsEditingAbout(true)}>
+                            <Pencil className="h-5 w-5 text-muted-foreground" />
+                        </Button>
+                        </>
+                    )}
+                    </div>
                 </div>
-            </div>
-            <Separator />
-            <div>
-                <Label className="text-primary">About</Label>
-                <div className="flex items-center gap-2 mt-2">
-                {isEditingAbout ? (
-                     <>
-                    <Input
-                        value={about}
-                        onChange={(e) => setAbout(e.target.value)}
-                        className="h-9"
-                        autoFocus
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                handleUpdateText('about_status', about);
-                                setIsEditingAbout(false);
-                            }
-                            if (e.key === 'Escape') setIsEditingAbout(false);
-                        }}
-                    />
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdateText('about_status', about); setIsEditingAbout(false); }}>
-                        <Check className="h-5 w-5" />
-                    </Button>
-                    </>
-                ) : (
-                    <>
-                    <p className="flex-1 text-sm py-1.5">{about}</p>
-                    <Button variant="ghost" size="icon" onClick={() => setIsEditingAbout(true)}>
-                        <Pencil className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                    </>
-                )}
-                </div>
-            </div>
+              </div>
             </div>
         </>
         )}
