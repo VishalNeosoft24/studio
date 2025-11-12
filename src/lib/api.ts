@@ -2,7 +2,8 @@
 
 
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload } from '@/types';
+
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -119,7 +120,7 @@ export async function getContacts(): Promise<Contact[]> {
         if (item.is_registered && item.contact) {
             return {
                 id: item.contact.id.toString(),
-                name: item.contact.display_name || item.contact.username,
+                name: item.name, // Use the user-defined name for the contact
                 avatarUrl: item.contact.profile_picture_url,
                 isMuted: item.is_muted,
                 about: item.contact.about_status,
@@ -141,6 +142,13 @@ export async function getContacts(): Promise<Contact[]> {
 export async function addContact(payload: AddContactPayload): Promise<ApiContact> {
     return await apiFetch('/contacts/add/', {
         method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function updateContact(contactId: number, payload: UpdateContactPayload): Promise<ApiContact> {
+    return await apiFetch(`/contacts/${contactId}/`, {
+        method: 'PATCH',
         body: JSON.stringify(payload),
     });
 }

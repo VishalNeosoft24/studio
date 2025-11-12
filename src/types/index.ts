@@ -4,6 +4,7 @@
 
 
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -13,7 +14,7 @@ export type User = {
     phone_number?: string | null;
     profile_picture_url?: string | null;
     about_status?: string | null;
-    avatarUrl?: string; // a bit redundant, can be cleaned up later
+    avatarUrl?: string | null; 
     about?: string; // a bit redundant
 }
 
@@ -56,6 +57,10 @@ export type CreateChatPayload = {
 export type AddContactPayload = {
     name: string;
     phone_number: string;
+};
+
+export type UpdateContactPayload = {
+    name?: string;
 };
 
 
