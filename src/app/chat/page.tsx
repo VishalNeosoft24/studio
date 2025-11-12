@@ -42,14 +42,17 @@ export default function ChatPage() {
   useEffect(() => {
     const chatIdFromUrl = searchParams.get('chatId');
     if (chatIdFromUrl && chats) {
-      // Find the chat to ensure it exists before setting it
       const chatExists = chats.some(c => c.id === chatIdFromUrl);
       if (chatExists) {
         setSelectedChatId(chatIdFromUrl);
-        // Clean the URL
+        // Clean the URL by replacing the current entry in the history
+        // This prevents the user from being stuck in a loop if they use the back button.
         router.replace('/chat', { scroll: false });
       } else {
+        // If the chat ID from the URL doesn't exist in our list, it might be an error or old link.
+        // We can either show a toast, or just ignore it. For now, we'll log a warning.
         console.warn(`Chat with ID "${chatIdFromUrl}" not found.`);
+        router.replace('/chat', { scroll: false });
       }
     }
   }, [searchParams, chats, router]);
