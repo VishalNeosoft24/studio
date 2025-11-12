@@ -33,16 +33,7 @@ export default function ChatPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  // Local state to reliably track the selected chat ID
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-
-  // Effect to synchronize local state with URL search params
-  useEffect(() => {
-    const chatIdFromUrl = searchParams.get('chatId');
-    if (chatIdFromUrl) {
-      setSelectedChatId(chatIdFromUrl);
-    }
-  }, [searchParams]);
+  const selectedChatId = searchParams.get('chatId');
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
@@ -50,15 +41,13 @@ export default function ChatPage() {
   });
   
   const handleSelectChat = (id: string) => {
-    // Update the local state and the URL
-    setSelectedChatId(id);
+    // Update the URL, which will trigger a re-render
     router.push(`/chat?chatId=${id}`, { scroll: false });
   };
 
   const selectedChat = chats?.find(c => c.id === selectedChatId);
 
   const handleCloseChat = () => {
-    setSelectedChatId(null);
     router.push('/chat', { scroll: false });
   };
 
