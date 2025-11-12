@@ -147,7 +147,7 @@ export async function addContact(payload: AddContactPayload): Promise<ApiContact
 }
 
 export async function updateContact(contactId: number, payload: UpdateContactPayload): Promise<ApiContact> {
-    return await apiFetch(`/contacts/${contactId}/`, {
+    return await apiFetch(`/contacts/update-by-user/${contactId}/`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
     });
