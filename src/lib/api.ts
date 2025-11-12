@@ -1,6 +1,4 @@
 
-
-
 import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -34,8 +32,11 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = getToken();
 
+  // Check if body is FormData, if so, don't set Content-Type header
+  const isFormData = options.body instanceof FormData;
+
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
@@ -71,10 +72,10 @@ export async function getProfile(): Promise<User> {
   return await apiFetch('/auth/profile/');
 }
 
-export async function updateProfile(payload: Partial<User>): Promise<User> {
+export async function updateProfile(payload: FormData): Promise<User> {
     return await apiFetch('/auth/profile/', {
         method: 'PATCH',
-        body: JSON.stringify(payload),
+        body: payload,
     });
 }
 
@@ -144,7 +145,7 @@ export function transformApiMessage(msg: any): Message {
     return {
       id: msg?.id?.toString() || `temp-${Date.now()}`,
       sender: senderId === currentUserId ? 'me' : 'contact',
-      type: msg?.message_type || 'text',
+      type: imageUrl ? 'image' : 'text', // Infer type from image presence
       text: content || '',
       imageUrl: imageUrl, // Add image URL to the transformed message
       timestamp: timestamp,

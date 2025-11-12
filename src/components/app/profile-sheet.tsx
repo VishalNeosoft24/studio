@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Pencil, Check, X, Loader2 } from 'lucide-react';
+import { Camera, Pencil, Check, Loader2 } from 'lucide-react';
 import { getProfile, updateProfile } from '@/lib/api';
 import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -45,11 +45,12 @@ const ProfileSkeleton = () => (
 export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: user, isLoading: isLoadingUser } = useQuery<User>({
     queryKey: ['profile'],
     queryFn: getProfile,
-    enabled: open, // Only fetch when the sheet is open
+    enabled: open,
   });
 
   const [displayName, setDisplayName] = useState('');
@@ -65,7 +66,11 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
   }, [user]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: updateProfile,
+    mutationFn: (payload: { field: 'display_name' | 'about_status' | 'profile_picture'; value: string | File }) => {
+        const formData = new FormData();
+        formData.append(payload.field, payload.value);
+        return updateProfile(formData);
+    },
     onSuccess: (data) => {
       queryClient.setQueryData(['profile'], data);
       queryClient.invalidateQueries({ queryKey: ['chats'] });
@@ -74,7 +79,6 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     },
     onError: (error) => {
       toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
-      // Revert optimistic update if needed, or refetch
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
   });
@@ -85,9 +89,20 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
         setDisplayName(user?.display_name || user?.username || '');
         return;
     }
-    updateProfileMutation.mutate({ [field]: value });
+    updateProfileMutation.mutate({ field, value });
   };
   
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            toast({ variant: 'destructive', title: 'Image too large', description: 'Please select an image smaller than 5MB.' });
+            return;
+        }
+        updateProfileMutation.mutate({ field: 'profile_picture', value: file });
+    }
+  };
+
   const getAvatarFallback = (name?: string) => {
       if (!name) return 'U';
       const parts = name.split(' ');
@@ -108,16 +123,29 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
             <SheetTitle>Profile</SheetTitle>
             </SheetHeader>
             <div className="flex flex-col items-center p-6 bg-background">
-            <div className="relative group cursor-pointer" onClick={() => toast({ title: 'Feature not implemented' })}>
-                <Avatar className="h-40 w-40">
-                <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
-                <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
-                </Avatar>
-                <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                <Camera className="h-8 w-8 text-white" />
-                <span className="text-white text-center text-xs mt-1">CHANGE<br />PROFILE PHOTO</span>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/png, image/jpeg, image/gif"
+                    onChange={handleFileChange}
+                />
+                <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    <Avatar className="h-40 w-40">
+                        <AvatarImage src={user?.profile_picture_url || ''} alt={user?.username} />
+                        <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
+                    </Avatar>
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                        {updateProfileMutation.isPending && updateProfileMutation.variables?.field === 'profile_picture' ? (
+                            <Loader2 className="h-8 w-8 text-white animate-spin" />
+                        ) : (
+                            <>
+                                <Camera className="h-8 w-8 text-white" />
+                                <span className="text-white text-center text-xs mt-1">CHANGE<br />PROFILE PHOTO</span>
+                            </>
+                        )}
+                    </div>
                 </div>
-            </div>
             </div>
 
             <div className="px-6 py-4 space-y-6">
