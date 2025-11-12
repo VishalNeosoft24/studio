@@ -12,7 +12,6 @@ import { getChats } from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-
 function ChatListSkeleton() {
   return (
     <div className="p-2">
@@ -38,28 +37,33 @@ export default function ChatPage() {
     queryKey: ['chats'],
     queryFn: getChats,
   });
-  
+
+  // ✅ FIXED useEffect – handle both early and late chat loading
   useEffect(() => {
     const chatIdFromUrl = searchParams.get('chatId');
-    if (chatIdFromUrl && chats) {
-      const chatExists = chats.some(c => c.id === chatIdFromUrl);
+    if (!chatIdFromUrl) return; // nothing to do
+
+    // Run this when chats finish loading
+    if (chats && chats.length > 0) {
+      const chatExists = chats.some(c => c.id.toString() === chatIdFromUrl);
       if (chatExists) {
+        console.log('✅ Setting chatId from URL:', chatIdFromUrl);
         setSelectedChatId(chatIdFromUrl);
       } else {
-        console.warn(`Chat with ID "${chatIdFromUrl}" not found.`);
+        console.warn(`❌ Chat with ID "${chatIdFromUrl}" not found in chats`);
       }
-      // Clean the URL by replacing the current entry in the history after processing.
-      // This prevents the user from being stuck on a specific chat if they refresh.
+      // Clean the URL once we've processed the chatId
       router.replace('/chat', { scroll: false });
     }
-  }, [searchParams, chats, router]);
-
+  }, [searchParams, chats, router]); // router added to dependency array
 
   const handleSelectChat = (id: string) => {
     setSelectedChatId(id);
+    // No need to push to URL here as selection is now local state. 
+    // This simplifies logic and avoids unnecessary URL changes when just browsing chats.
   };
 
-  const selectedChat = chats?.find(c => c.id === selectedChatId);
+  const selectedChat = chats?.find(c => c.id.toString() === selectedChatId);
 
   const handleCloseChat = () => {
     setSelectedChatId(null);
@@ -87,13 +91,12 @@ export default function ChatPage() {
       {/* Right section - Chat window */}
       <div className="flex-1 flex flex-col">
         {selectedChatId && selectedChat ? (
-            <ChatWindow
-              key={selectedChat.id}
-              chat={selectedChat}
-              onCloseChat={handleCloseChat}
-            />
+          <ChatWindow
+            key={selectedChat.id}
+            chat={selectedChat}
+            onCloseChat={handleCloseChat}
+          />
         ) : (
-          // If there's no chatId, show the placeholder.
           <ChatPlaceholder />
         )}
       </div>
