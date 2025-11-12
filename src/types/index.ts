@@ -2,12 +2,14 @@
 
 
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
     username: string;
     display_name?: string | null;
     email?: string;
+    phone_number?: string;
     profile_picture_url?: string | null;
     about_status?: string | null;
     avatarUrl?: string; // a bit redundant, can be cleaned up later
@@ -30,6 +32,7 @@ export type RegisterPayload = {
 export type Participant = {
     id: number;
     username: string;
+    phone_number: string;
     profile_picture_url: string | null;
     display_name?: string | null;
 }
@@ -110,3 +113,4 @@ export type Contact = {
     isRegistered: boolean;
 };
     
+

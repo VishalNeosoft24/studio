@@ -5,8 +5,9 @@ import type { Participant } from '@/types';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { BellOff, Ban, X } from 'lucide-react';
+import { BellOff, Ban, X, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 interface ContactInfoSheetProps {
   participant: Participant;
@@ -15,9 +16,19 @@ interface ContactInfoSheetProps {
 }
 
 export default function ContactInfoSheet({ participant, open, onOpenChange }: ContactInfoSheetProps) {
+  const { toast } = useToast();
+
   if (!participant) return null;
     
   const displayName = participant.display_name || participant.username;
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: 'Copied!',
+      description: `${text} has been copied to your clipboard.`,
+    });
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -43,10 +54,21 @@ export default function ContactInfoSheet({ participant, open, onOpenChange }: Co
             </div>
             <Separator />
             <div className="px-6 py-4 space-y-4">
-            <div>
-                <h3 className="text-sm font-medium text-primary">About</h3>
-                <p className="text-sm mt-1">{'Hey there! I am using Chatterbox.'}</p>
-            </div>
+                <div>
+                    <h3 className="text-sm font-medium text-primary">About</h3>
+                    <p className="text-sm mt-1">{'Hey there! I am using Chatterbox.'}</p>
+                </div>
+                <Separator />
+                 <div>
+                    <h3 className="text-sm font-medium text-primary">Phone</h3>
+                    <div className="flex items-center justify-between mt-1">
+                        <p className="text-sm">{participant.phone_number}</p>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleCopy(participant.phone_number)}>
+                            <Copy className="h-4 w-4" />
+                            <span className="sr-only">Copy phone number</span>
+                        </Button>
+                    </div>
+                </div>
             </div>
             <Separator />
             <div className="p-4 space-y-1">
