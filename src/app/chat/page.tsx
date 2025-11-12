@@ -31,12 +31,30 @@ function ChatListSkeleton() {
 
 export default function ChatPage() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
     queryFn: getChats,
   });
   
+  useEffect(() => {
+    const chatIdFromUrl = searchParams.get('chatId');
+    if (chatIdFromUrl && chats) {
+      // Find the chat to ensure it exists before setting it
+      const chatExists = chats.some(c => c.id === chatIdFromUrl);
+      if (chatExists) {
+        setSelectedChatId(chatIdFromUrl);
+        // Clean the URL
+        router.replace('/chat', { scroll: false });
+      } else {
+        console.warn(`Chat with ID "${chatIdFromUrl}" not found.`);
+      }
+    }
+  }, [searchParams, chats, router]);
+
+
   const handleSelectChat = (id: string) => {
     setSelectedChatId(id);
   };
