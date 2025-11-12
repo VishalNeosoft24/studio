@@ -1,5 +1,6 @@
 
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -10,6 +11,12 @@ export type User = {
     about_status?: string | null;
     avatarUrl?: string; // a bit redundant, can be cleaned up later
     about?: string; // a bit redundant
+}
+
+export type UpdateProfilePayload = {
+    display_name?: string;
+    about_status?: string;
+    profile_picture_url?: string; // Can be a base64 data URI
 }
 
 export type RegisterPayload = {

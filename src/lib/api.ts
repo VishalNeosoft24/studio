@@ -1,5 +1,6 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload } from '@/types';
+
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -72,10 +73,10 @@ export async function getProfile(): Promise<User> {
   return await apiFetch('/auth/profile/');
 }
 
-export async function updateProfile(payload: FormData): Promise<User> {
+export async function updateProfile(payload: UpdateProfilePayload): Promise<User> {
     return await apiFetch('/auth/profile/', {
         method: 'PATCH',
-        body: payload,
+        body: JSON.stringify(payload),
     });
 }
 
