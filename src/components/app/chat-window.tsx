@@ -131,7 +131,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     }
   }
 
-  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', profile_picture_url: null };
+  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null };
 
   return (
     <>
