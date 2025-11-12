@@ -1,5 +1,6 @@
 
 
+
 import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -80,6 +81,16 @@ export async function updateProfile(payload: UpdateProfilePayload): Promise<User
     });
 }
 
+export async function uploadProfilePicture(file: File): Promise<{ profile_picture_url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return await apiFetch('/auth/upload-profile/', {
+        method: 'POST',
+        body: formData,
+    });
+}
+
 
 export async function getChats(): Promise<Chat[]> {
   return await apiFetch("/chats/");
@@ -101,7 +112,7 @@ export async function getContacts(): Promise<Contact[]> {
         if (item.is_registered && item.contact) {
             return {
                 id: item.contact.id.toString(),
-                name: item.contact.username,
+                name: item.contact.display_name || item.contact.username,
                 avatarUrl: item.contact.profile_picture_url,
                 isMuted: item.is_muted,
                 about: item.contact.about_status,

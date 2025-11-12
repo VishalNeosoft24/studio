@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Camera, Pencil, Check, Loader2 } from 'lucide-react';
-import { getProfile, updateProfile } from '@/lib/api';
+import { getProfile, updateProfile, uploadProfilePicture } from '@/lib/api';
 import type { User, UpdateProfilePayload } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -42,15 +42,6 @@ const ProfileSkeleton = () => (
     </div>
 );
 
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-    });
-};
-
 export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,29 +65,41 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
     }
   }, [user]);
 
-  const updateProfileMutation = useMutation({
+  const textUpdateMutation = useMutation({
     mutationFn: (payload: UpdateProfilePayload) => updateProfile(payload),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['profile'], data);
-      // Invalidate queries that depend on profile data (like chat list display names)
-      queryClient.invalidateQueries({ queryKey: ['chats'] });
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(['profile'], updatedUser);
       toast({ title: 'Profile Updated', description: 'Your profile has been successfully updated.' });
     },
     onError: (error) => {
       toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
-      // Refetch profile to revert optimistic updates or show server state
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
   });
+  
+  const pictureUploadMutation = useMutation({
+    mutationFn: (file: File) => uploadProfilePicture(file),
+    onSuccess: (data) => {
+        queryClient.setQueryData(['profile'], (oldData: User | undefined) => {
+            if (!oldData) return undefined;
+            return { ...oldData, profile_picture_url: data.profile_picture_url };
+        });
+        queryClient.invalidateQueries({ queryKey: ['chats'] });
+        queryClient.invalidateQueries({ queryKey: ['contacts'] });
+        toast({ title: 'Profile Picture Updated' });
+    },
+    onError: (error) => {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    }
+  });
 
-  const handleUpdate = (field: 'display_name' | 'about_status', value: string) => {
+  const handleUpdateText = (field: 'display_name' | 'about_status', value: string) => {
     if (field === 'display_name' && value.trim() === '') {
         toast({ variant: 'destructive', title: 'Invalid Name', description: 'Name cannot be empty.'});
         setDisplayName(user?.display_name || user?.username || '');
         return;
     }
-    updateProfileMutation.mutate({ [field]: value });
+    textUpdateMutation.mutate({ [field]: value });
   };
   
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,12 +109,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
             toast({ variant: 'destructive', title: 'Image too large', description: 'Please select an image smaller than 5MB.' });
             return;
         }
-        try {
-            const base64String = await fileToBase64(file);
-            updateProfileMutation.mutate({ profile_picture_url: base64String });
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Could not process image', description: 'Please try a different image.'})
-        }
+        pictureUploadMutation.mutate(file);
     }
   };
 
@@ -148,7 +146,7 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                         <AvatarFallback>{getAvatarFallback(displayName)}</AvatarFallback>
                     </Avatar>
                     <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-                        {updateProfileMutation.isPending && updateProfileMutation.variables?.profile_picture_url ? (
+                        {pictureUploadMutation.isPending ? (
                             <Loader2 className="h-8 w-8 text-white animate-spin" />
                         ) : (
                             <>
@@ -173,13 +171,13 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                         autoFocus
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                                handleUpdate('display_name', displayName);
+                                handleUpdateText('display_name', displayName);
                                 setIsEditingName(false);
                             }
                             if (e.key === 'Escape') setIsEditingName(false);
                         }}
                     />
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdate('display_name', displayName); setIsEditingName(false); }}>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdateText('display_name', displayName); setIsEditingName(false); }}>
                         <Check className="h-5 w-5" />
                     </Button>
                     </>
@@ -206,13 +204,13 @@ export default function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) 
                         autoFocus
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                                handleUpdate('about_status', about);
+                                handleUpdateText('about_status', about);
                                 setIsEditingAbout(false);
                             }
                             if (e.key === 'Escape') setIsEditingAbout(false);
                         }}
                     />
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdate('about_status', about); setIsEditingAbout(false); }}>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => { handleUpdateText('about_status', about); setIsEditingAbout(false); }}>
                         <Check className="h-5 w-5" />
                     </Button>
                     </>

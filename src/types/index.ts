@@ -1,6 +1,7 @@
 
 
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -16,7 +17,6 @@ export type User = {
 export type UpdateProfilePayload = {
     display_name?: string;
     about_status?: string;
-    profile_picture_url?: string; // Can be a base64 data URI
 }
 
 export type RegisterPayload = {
@@ -90,12 +90,13 @@ export type ApiContact = {
         username: string;
         profile_picture_url: string | null;
         about_status: string | null;
+        display_name?: string | null;
     } | null; // Can be null if not registered
     phone_number: string;
     name: string; // Name from phone contacts
     is_registered: boolean;
     is_blocked: boolean;
-is_muted: boolean;
+    is_muted: boolean;
     created_at: string;
 };
 
