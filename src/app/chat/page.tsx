@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { Chat } from '@/types';
 import ChatList from '@/components/app/chat-list';
 import ChatWindow from '@/components/app/chat-window';
@@ -29,38 +29,23 @@ function ChatListSkeleton() {
 }
 
 export default function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const selectedChatId = searchParams.get('chatId');
 
   const { data: chats, isLoading, isError } = useQuery<Chat[]>({
     queryKey: ['chats'],
     queryFn: getChats,
   });
 
-  // This effect handles the initial loading of a chat from a URL parameter.
-  // It runs when the chats are loaded and sets the state.
-  useEffect(() => {
-    const chatIdFromUrl = searchParams.get('chatId');
-    if (chatIdFromUrl && chats && chats.length > 0) {
-      const chatExists = chats.some(c => c.id.toString() === chatIdFromUrl);
-      if (chatExists) {
-        setSelectedChatId(chatIdFromUrl);
-        // Clean the URL to prevent this effect from re-running on other state changes.
-        // This is a "fire-and-forget" redirect handler.
-        router.replace('/chat', { scroll: false });
-      }
-    }
-  }, [chats, searchParams, router]);
-
   const handleSelectChat = (id: string) => {
-    // Simply update the state. Do not push to router here.
-    // This prevents re-renders that break the WebSocket connection's context.
-    setSelectedChatId(id);
+    // Update the URL to reflect the selected chat. This is the single source of truth.
+    router.push(`/chat?chatId=${id}`);
   };
 
   const handleCloseChat = () => {
-    setSelectedChatId(null);
+    // Clear the chat selection by updating the URL
+    router.push('/chat');
   };
 
   const selectedChat = useMemo(() => {
