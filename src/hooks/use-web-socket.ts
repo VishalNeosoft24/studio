@@ -3,8 +3,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { Message } from '@/types';
-import { getCurrentUserId, transformApiMessage } from '@/lib/api';
+import type { Message, ApiMessage } from '@/types';
+import { getCurrentUserId } from '@/lib/api';
 import { usePresenceStore } from '@/stores/use-presence-store';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
@@ -16,7 +16,7 @@ type WebSocketHook = {
   isConnected: boolean;
 };
 
-export function useWebSocket(chatId: string | null | undefined, queryClient: QueryClient): WebSocketHook {
+export function useWebSocket(chatId: string | null, queryClient: QueryClient): WebSocketHook {
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,7 +54,25 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
     
     let isComponentMounted = true;
     const currentUserId = getCurrentUserId();
-    const { setPresence, setTyping: setTypingInStore } = usePresenceStore.getState();
+    const { setPresence, setTyping } = usePresenceStore.getState();
+
+    // This specific transformer is for WS messages ONLY.
+    const transformWsMessage = (wsMsg: any): Message => {
+        const senderId = wsMsg.sender_id;
+        const content = wsMsg.message;
+        const imageUrl = wsMsg.image || null;
+    
+        return {
+          id: wsMsg.id.toString(),
+          chatId: wsMsg.chat_id.toString(), // CRITICAL: Read chat_id from WS payload
+          sender: senderId === currentUserId ? 'me' : 'contact',
+          type: imageUrl ? 'image' : 'text',
+          text: content || '',
+          imageUrl: imageUrl,
+          timestamp: new Date(wsMsg.created_at),
+          status: 'sent', // Default status, will be updated by delivery receipts
+        };
+    };
 
     const cleanup = () => {
       isComponentMounted = false;
@@ -100,12 +118,10 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
           console.log("📩 WS received:", data);
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-            const newMessage = transformApiMessage(data.message);
+            const newMessage = transformWsMessage(data.message);
             
-            // This is the functional update. It's safer and avoids race conditions.
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData) => {
+            queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
               const existingMessages = oldData ?? [];
-              // Prevent adding duplicates
               if (existingMessages.some(msg => msg.id === newMessage.id)) {
                 return existingMessages;
               }
@@ -113,13 +129,14 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
             });
 
           } else if (data.type === 'delivery_status') {
+             // Use chatId from the hook's scope as delivery status doesn't contain it
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
               oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: data.status } : m)
             );
           } else if (data.type === 'presence_update') {
             setPresence(data.user_id, data.is_online, data.last_seen);
           } else if (data.type === 'typing' && data.user_id !== currentUserId) {
-            setTypingInStore(String(chatId), data.user_id, data.is_typing);
+            setTyping(String(chatId), data.user_id, data.is_typing);
           }
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
@@ -133,7 +150,6 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
         ws.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        // Only attempt to reconnect if the closure was unexpected and the component is still mounted.
         if(isComponentMounted && !reconnectTimeoutRef.current) {
             console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
@@ -143,14 +159,14 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
       socket.onerror = (error) => {
         if (!isComponentMounted) return;
         console.error('WebSocket error:', error);
-        socket.close(); // This will trigger the onclose handler for reconnection logic.
+        socket.close(); 
       };
     };
 
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing]); // This effect now ONLY re-runs if chatId or queryClient changes.
+  }, [chatId, queryClient, sendPing]);
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }
