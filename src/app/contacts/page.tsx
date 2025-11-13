@@ -73,6 +73,7 @@ export default function ContactsPage() {
         });
         
         // --- The Core Fix: Manually update the query cache ---
+        // This ensures the chat page will find the new chat immediately.
         queryClient.setQueryData(['chats'], (oldData: Chat[] | undefined) => {
             return oldData ? [...oldData, newChat] : [newChat];
         });
