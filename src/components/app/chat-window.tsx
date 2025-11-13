@@ -1,8 +1,7 @@
-
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -64,7 +63,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   const chatDisplayName = chat.chat_display_name;
 
-  const { isOnline, lastSeen, isTyping, setPresence, setTyping } = usePresenceStore();
+  const { isOnline, lastSeen, isTyping } = usePresenceStore();
 
   const isOtherUserOnline = isOnline(otherParticipant?.id);
   const otherUserLastSeen = lastSeen(otherParticipant?.id);
@@ -77,48 +76,8 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  const handleWebSocketMessage = useCallback((messageEvent: MessageEvent) => {
-    try {
-      const data = JSON.parse(messageEvent.data);
-      console.log("📩 WS received:", data);
-
-      if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        const newMessage = transformApiMessage(data.message);
-        
-        if (String(newMessage.chatId) === String(chat.id)) {
-            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages) => {
-                const existingMessages = oldMessages ?? [];
-                if (existingMessages.some(msg => msg.id === newMessage.id)) {
-                    return existingMessages;
-                }
-                return [...existingMessages, newMessage];
-            });
-            // Also invalidate the main chats query to update last message preview
-            queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
-        }
-      } else if (data.type === 'delivery_status') {
-        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
-          oldMessages.map(m =>
-            m.id === data.message_id
-              ? { ...m, status: data.status }
-              : m
-          )
-        );
-      } else if (data.type === 'presence_update') {
-        setPresence(data.user_id, data.is_online, data.last_seen);
-        queryClient.invalidateQueries({queryKey: ['chats']});
-      } else if (data.type === 'typing') {
-        if (data.user_id !== currentUserId) {
-            setTyping(String(chat.id), data.user_id, data.is_typing);
-        }
-      }
-
-    } catch (e) {
-      console.error('Failed to parse incoming WebSocket message', e);
-    }
-  }, [chat.id, queryClient, currentUserId, setPresence, setTyping]);
-
-  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
+  // The hook now internally handles message processing and cache updates.
+  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, queryClient);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -128,7 +87,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             }
         }, 100);
     }
-  }, [messages, chat.id]);
+  }, [messages.length, chat.id]);
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
