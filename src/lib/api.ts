@@ -166,7 +166,6 @@ export function transformApiMessage(msg: any): Message {
     const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
     const imageUrl = msg?.image ?? null;
     
-    // THE FIX: Correctly get the chatId from both REST and WebSocket payloads
     const chatId = msg?.chat?.toString() ?? msg?.chat_id?.toString() ?? '';
   
     return {
