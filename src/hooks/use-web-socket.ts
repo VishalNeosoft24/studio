@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { Message, ApiMessage } from '@/types';
+import type { Message } from '@/types';
 import { getCurrentUserId } from '@/lib/api';
 import { usePresenceStore } from '@/stores/use-presence-store';
 
@@ -56,21 +56,19 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     const currentUserId = getCurrentUserId();
     const { setPresence, setTyping } = usePresenceStore.getState();
 
-    // This specific transformer is for WS messages ONLY.
+    // This transformer is for WS messages ONLY. It correctly extracts chat_id.
     const transformWsMessage = (wsMsg: any): Message => {
         const senderId = wsMsg.sender_id;
-        const content = wsMsg.message;
-        const imageUrl = wsMsg.image || null;
     
         return {
           id: wsMsg.id.toString(),
           chatId: wsMsg.chat_id.toString(), // CRITICAL: Read chat_id from WS payload
           sender: senderId === currentUserId ? 'me' : 'contact',
-          type: imageUrl ? 'image' : 'text',
-          text: content || '',
-          imageUrl: imageUrl,
+          type: wsMsg.image ? 'image' : 'text',
+          text: wsMsg.message || '',
+          imageUrl: wsMsg.image || null,
           timestamp: new Date(wsMsg.created_at),
-          status: 'sent', // Default status, will be updated by delivery receipts
+          status: 'sent',
         };
     };
 
@@ -166,7 +164,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing]);
+  }, [chatId, queryClient, sendPing]); // Dependencies are stable primitives
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }
