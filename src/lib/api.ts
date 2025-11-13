@@ -163,17 +163,14 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
  */
 export function transformApiMessage(apiMsg: ApiMessage): Message {
     const currentUserId = getCurrentUserId();
-    const senderId = apiMsg.sender.id;
-    const content = apiMsg.content;
-    const imageUrl = apiMsg.image || null;
-
+    
     return {
       id: apiMsg.id.toString(),
       chatId: apiMsg.chat.toString(), 
-      sender: senderId === currentUserId ? 'me' : 'contact',
-      type: imageUrl ? 'image' : 'text',
-      text: content || '',
-      imageUrl: imageUrl,
+      sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
+      type: apiMsg.image ? 'image' : 'text',
+      text: apiMsg.content || '',
+      imageUrl: apiMsg.image || null,
       timestamp: new Date(apiMsg.created_at),
       status: 'sent', // Default status, can be updated by delivery receipts
     };

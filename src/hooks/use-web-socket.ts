@@ -21,6 +21,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentUserId = getCurrentUserId();
 
   const sendRaw = useCallback((payload: object) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -54,18 +55,15 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     }
     
     let isComponentMounted = true;
-    const currentUserId = getCurrentUserId();
     const { setPresence, setTyping } = usePresenceStore.getState();
 
     // This transformer is for WS messages ONLY.
     // It correctly parses the payload from your Python consumer.
     const transformWsMessage = (wsMsg: any): Message => {
-        const senderId = wsMsg.sender_id;
-    
         return {
           id: wsMsg.id.toString(),
-          chatId: wsMsg.chat_id.toString(), // CRITICAL FIX: Use chat_id from the payload
-          sender: senderId === currentUserId ? 'me' : 'contact',
+          chatId: wsMsg.chat_id.toString(),
+          sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
           type: wsMsg.image ? 'image' : 'text',
           text: wsMsg.message || '',
           imageUrl: wsMsg.image || null,
@@ -168,7 +166,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing]); 
+  }, [chatId, queryClient, sendPing, currentUserId]); 
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }

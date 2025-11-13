@@ -63,18 +63,14 @@ export type UpdateContactPayload = {
 };
 
 
-// Represents the raw message from your DRF API (via WebSocket or REST)
+// Represents the raw message from your DRF REST API (for old messages)
 export type ApiMessage = {
     id: number;
-    chatId: string;
-    sender: Participant; // This might be nested in your WS response
-    sender_id: number;
-    sender_username: string;
+    chat: number;
+    sender: Participant;
     content: string;
-    message: string; // Your WS consumer seems to use 'message' for content
-    message_type: 'text' | 'image' | 'file'; // As defined by your backend
-    timestamp: string; // ISO 8601 date string
-    created_at: string; // Your WS consumer uses this
+    message_type: 'text' | 'image' | 'file';
+    created_at: string; // ISO 8601 date string
     image?: string | null; // URL for the image
 };
 
