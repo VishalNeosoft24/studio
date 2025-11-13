@@ -85,10 +85,8 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
         const newMessage = transformApiMessage(data.message);
         
-        // RELIABLE ID COMPARISON - This is the fix.
         if (String(newMessage.chatId) === String(chat.id)) {
             queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
-                // Avoid adding duplicate messages
                 if (oldMessages.some(msg => msg.id === newMessage.id)) {
                     return oldMessages;
                 }
