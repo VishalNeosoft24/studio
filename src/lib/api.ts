@@ -160,22 +160,24 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
 
 export function transformApiMessage(msg: any): Message {
     const currentUserId = getCurrentUserId();
-    // Handle both REST and WebSocket message structures
+    // Handle both REST (initial fetch) and WebSocket message structures
     const senderId = msg?.sender?.id ?? msg?.sender_id;
-    const content = msg?.content ?? msg?.message;
+    const content = msg?.content ?? msg?.message; // REST uses 'content', WS uses 'message'
     const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
-    const imageUrl = msg?.image ?? null; // Handle image URL
-    const chatId = msg?.chat_id?.toString() || '';
+    const imageUrl = msg?.image ?? null;
+    
+    // THE FIX: Correctly get the chatId from both REST and WebSocket payloads
+    const chatId = msg?.chat?.toString() ?? msg?.chat_id?.toString() ?? '';
   
     return {
       id: msg?.id?.toString() || `temp-${Date.now()}`,
       chatId: chatId,
       sender: senderId === currentUserId ? 'me' : 'contact',
-      type: imageUrl ? 'image' : 'text', // Infer type from image presence
+      type: imageUrl ? 'image' : 'text',
       text: content || '',
-      imageUrl: imageUrl, // Add image URL to the transformed message
+      imageUrl: imageUrl,
       timestamp: timestamp,
-      status: 'sent', // Default to sent, will be updated by WS
+      status: 'sent', // Default status, will be updated by WebSocket 'delivery_status' events
     };
 };
 
