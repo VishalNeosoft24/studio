@@ -169,6 +169,9 @@ export function transformApiMessage(msg: any): Message {
     const content = msg?.content ?? msg?.message; // REST uses 'content', WS uses 'message'
     const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
     const imageUrl = msg?.image ?? null;
+    
+    // CRITICAL FIX: The WebSocket payload has `chat_id`, while the REST payload has `chat`.
+    // This now correctly handles both structures.
     const chatId = msg?.chat?.toString() ?? msg?.chat_id?.toString() ?? '';
   
     return {
