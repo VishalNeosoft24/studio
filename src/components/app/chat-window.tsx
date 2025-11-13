@@ -86,11 +86,12 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         const newMessage = transformApiMessage(data.message);
         
         if (String(newMessage.chatId) === String(chat.id)) {
-            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
-                if (oldMessages.some(msg => msg.id === newMessage.id)) {
-                    return oldMessages;
+            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages) => {
+                const existingMessages = oldMessages ?? [];
+                if (existingMessages.some(msg => msg.id === newMessage.id)) {
+                    return existingMessages; // Message already exists, do nothing
                 }
-                return [...oldMessages, newMessage];
+                return [...existingMessages, newMessage]; // Add the new message
             });
         }
         queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
