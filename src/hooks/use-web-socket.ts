@@ -116,11 +116,9 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
-          // Handle chat messages
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const newMessage = transformWsMessage(data.message);
             
-            // Use functional update to ensure we're not using stale state
             queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
               const existingMessages = oldData ?? [];
               if (existingMessages.some(msg => msg.id === newMessage.id)) {
@@ -128,12 +126,9 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
               }
               return [...existingMessages, newMessage];
             });
-            // Invalidate chats list to update last message preview
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
-          // Handle other event types
           } else if (data.type === 'delivery_status') {
-            // Note: delivery_status from the backend doesn't contain chat_id, so we use the hook's scope.
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
               oldData.map(m => m.id === String(data.message_id) ? { ...m, status: data.status } : m)
             );
@@ -155,7 +150,6 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         ws.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        // Do not reconnect automatically if the closure was intentional
         if (event.code !== 1000 && isComponentMounted && !reconnectTimeoutRef.current) {
             console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
