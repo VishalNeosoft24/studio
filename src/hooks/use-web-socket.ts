@@ -8,6 +8,7 @@ const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 type WebSocketHook = {
   sendMessage: (message: string) => boolean;
   sendImage: (image: string, caption: string) => boolean;
+  sendTyping: (isTyping: boolean) => void;
   isConnected: boolean;
 };
 
@@ -15,38 +16,33 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const sendRaw = (payload: object) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify(payload));
+      return true;
+    }
+    console.error('WebSocket is not open. Cannot send message.');
+    return false;
+  }
 
   const sendMessage = useCallback((text: string) => {
-    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not open. Cannot send message.');
-      return false;
-    }
-
-    const payload = JSON.stringify({
-      message_type: "text",
-      message: text,
-    });
-
-    ws.current.send(payload);
-    console.log("⬆️ WS sent (text):", payload);
-    return true;
+    console.log("⬆️ WS sent (text):", text);
+    return sendRaw({ message_type: "text", message: text });
   }, []);
   
   const sendImage = useCallback((image: string, caption: string) => {
-    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-        console.error('WebSocket is not open. Cannot send image.');
-        return false;
-    }
+    console.log("⬆️ WS sent (image):", { message: caption, image: "..." });
+    return sendRaw({ message_type: "image", image: image, message: caption });
+  }, []);
+  
+  const sendTyping = useCallback((isTyping: boolean) => {
+    sendRaw({ message_type: "typing", is_typing: isTyping });
+  }, []);
 
-    const payload = JSON.stringify({
-        message_type: "image",
-        image: image, // base64 data URL
-        message: caption,
-    });
-
-    ws.current.send(payload);
-    console.log("⬆️ WS sent (image):", { message_type: "image", message: caption, image: "..." });
-    return true;
+  const sendPing = useCallback(() => {
+    sendRaw({ message_type: "ping" });
   }, []);
 
   useEffect(() => {
@@ -54,8 +50,26 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
     
     let isComponentMounted = true;
 
+    const cleanup = () => {
+      isComponentMounted = false;
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      if (ws.current) {
+        ws.current.onclose = null; 
+        ws.current.close();
+        ws.current = null;
+        console.log("WebSocket connection closed on component unmount.");
+      }
+    };
+
     const connect = () => {
-      if (!isComponentMounted || (ws.current && ws.current.readyState === WebSocket.OPEN)) {
+      if (!isComponentMounted || ws.current) {
         return;
       }
       
@@ -78,10 +92,14 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         if (!isComponentMounted) return;
         console.log('✅ WebSocket connection established for chat', chatId);
         setIsConnected(true);
+
         if (reconnectTimeoutRef.current) {
             clearTimeout(reconnectTimeoutRef.current);
             reconnectTimeoutRef.current = null;
         }
+
+        // Start sending pings every 30 seconds to keep connection alive
+        pingIntervalRef.current = setInterval(sendPing, 30000);
       };
 
       socket.onmessage = (event) => {
@@ -94,7 +112,14 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         console.log('❌ WebSocket connection closed:', event.code, event.reason);
         setIsConnected(false);
         ws.current = null;
+
+        if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
+        }
+
         if(isComponentMounted && !reconnectTimeoutRef.current) {
+            console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
       };
@@ -102,24 +127,14 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
       socket.onerror = (error) => {
         if (!isComponentMounted) return;
         console.error('WebSocket error:', error);
-        // The onclose event will be fired next, which will handle reconnection.
+        socket.close(); // This will trigger onclose and handle reconnection
       };
     };
 
     connect();
 
-    return () => {
-      isComponentMounted = false;
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (ws.current) {
-        ws.current.onclose = null; 
-        ws.current.close();
-        console.log("WebSocket connection closed on component unmount.");
-      }
-    };
-  }, [chatId, onMessage]);
+    return cleanup;
+  }, [chatId, onMessage, sendPing]);
 
-  return { sendMessage, sendImage, isConnected };
+  return { sendMessage, sendImage, sendTyping, isConnected };
 }

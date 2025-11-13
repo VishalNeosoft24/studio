@@ -5,6 +5,7 @@
 
 
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -16,6 +17,8 @@ export type User = {
     about_status?: string | null;
     avatarUrl?: string | null; 
     about?: string; // a bit redundant
+    is_online: boolean;
+    last_seen: string | null;
 }
 
 export type UpdateProfilePayload = {
@@ -37,6 +40,8 @@ export type Participant = {
     phone_number: string;
     profile_picture_url: string | null;
     display_name?: string | null;
+    is_online: boolean;
+    last_seen: string | null;
 }
 
 export type Chat = {
@@ -67,6 +72,7 @@ export type UpdateContactPayload = {
 // Represents the raw message from your DRF API (via WebSocket or REST)
 export type ApiMessage = {
     id: number;
+    chatId: string;
     sender: Participant; // This might be nested in your WS response
     sender_id: number;
     sender_username: string;
@@ -82,6 +88,7 @@ export type ApiMessage = {
 // Represents a message transformed for the UI
 export type Message = {
   id: string;
+  chatId: string;
   sender: 'me' | 'contact'; // Simplified for UI purposes
   type: 'text' | 'image';
   text: string;
@@ -117,5 +124,17 @@ export type Contact = {
     isMuted: boolean;
     about: string | null;
     isRegistered: boolean;
+};
+
+export type PresenceState = {
+    onlineUsers: Record<number, { last_seen: string | null }>;
+    typingUsers: Record<string, number[]>; // { chatId: [userId1, userId2] }
+    
+    isOnline: (userId: number) => boolean;
+    lastSeen: (userId: number) => string | null;
+    isTyping: (chatId: string, userId: number) => boolean;
+
+    setPresence: (userId: number, isOnline: boolean, lastSeen: string | null) => void;
+    setTyping: (chatId: string, userId: number, isTyping: boolean) => void;
 };
     

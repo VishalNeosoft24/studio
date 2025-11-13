@@ -15,11 +15,12 @@ import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
-import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay, formatDistanceToNowStrict } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
+import { getMessages, getCurrentUserId, transformApiMessage, getChats } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
+import { usePresenceStore } from '@/stores/use-presence-store';
 
 
 const DateSeparator = ({ date }: { date: Date }) => {
@@ -48,7 +49,6 @@ interface ChatWindowProps {
 function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isTyping, setIsTyping] = useState(false);
   
   const [isContactInfoOpen, setContactInfoOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -63,6 +63,12 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
   const chatDisplayName = chat.chat_display_name;
+
+  const { isOnline, lastSeen, isTyping, setPresence, setTyping } = usePresenceStore();
+
+  const isOtherUserOnline = isOnline(otherParticipant?.id);
+  const otherUserLastSeen = lastSeen(otherParticipant?.id);
+  const isOtherUserTyping = isTyping(chat.id, otherParticipant?.id);
   
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
@@ -77,11 +83,13 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       console.log("📩 WS received:", data);
 
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        // Optimistically update the UI, then invalidate to refetch and confirm
         const newMessage = transformApiMessage(data.message);
-        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => [...oldMessages, newMessage]);
-        queryClient.invalidateQueries({ queryKey: ['messages', chat.id], exact: true });
-      } else if (data.type === 'delivery_status') {
+        if (newMessage.chatId === chat.id) {
+          queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => [...oldMessages, newMessage]);
+        }
+        queryClient.invalidateQueries({ queryKey: ['chats'], exact: true }); // To update last message in chat list
+      } 
+      else if (data.type === 'delivery_status') {
         queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
           oldMessages.map(m =>
             m.id === data.message_id
@@ -90,12 +98,23 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           )
         );
       }
+      else if (data.type === 'presence_update') {
+        setPresence(data.user_id, data.is_online, data.last_seen);
+        queryClient.invalidateQueries({queryKey: ['chats']});
+      }
+      else if (data.type === 'typing') {
+        // Ensure we don't show typing indicator for the current user
+        if (data.user_id !== currentUserId) {
+            setTyping(data.chat_id, data.user_id, data.is_typing);
+        }
+      }
+
     } catch (e) {
       console.error('Failed to parse incoming WebSocket message', e);
     }
-  }, [chat.id, queryClient]);
+  }, [chat.id, queryClient, setPresence, setTyping, currentUserId]);
   
-  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
+  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -123,14 +142,28 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   const getStatusIcon = (status?: 'sent' | 'delivered' | 'read') => {
     switch (status) {
-      case 'read': return <CheckCheck className="h-4 w-4 text-accent" />;
+      case 'read': return <CheckCheck className="h-4 w-4 text-blue-500" />;
       case 'delivered': return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
       case 'sent': return <Check className="h-4 w-4 text-muted-foreground" />;
       default: return null;
     }
   }
 
-  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null };
+  const formatLastSeen = (timestamp: string | null) => {
+    if (!timestamp) return 'Offline';
+    return `Last seen ${formatDistanceToNowStrict(new Date(timestamp))} ago`;
+  };
+
+  const getStatusText = () => {
+    if (isBlocked) return 'Blocked';
+    if (isOtherUserTyping) return 'typing...';
+    if (isOtherUserOnline) return 'Online';
+    if (otherUserLastSeen) return formatLastSeen(otherUserLastSeen);
+    if (!isConnected) return 'Connecting...';
+    return 'Offline';
+  }
+
+  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, is_online: false, last_seen: null };
 
   return (
     <>
@@ -159,7 +192,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{chatDisplayName} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{isBlocked ? 'Blocked' : isTyping ? 'typing...' : (isConnected ? 'Online' : 'Connecting...')}</p>
+            <p className="text-xs text-muted-foreground">{getStatusText()}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -271,7 +304,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Alert>
         </CardFooter>
       ) : (
-        <MessageInput onSendMessage={sendMessage} onSendImage={sendImage} isConnected={isConnected} />
+        <MessageInput onSendMessage={sendMessage} onSendImage={sendImage} onTyping={sendTyping} isConnected={isConnected} />
       )}
     </Card>
     </>
