@@ -159,6 +159,7 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
 
 /**
  * Transforms a message from the initial REST API fetch into a format the UI can use.
+ * This is for OLD messages loaded via HTTP.
  */
 export function transformApiMessage(apiMsg: ApiMessage): Message {
     const currentUserId = getCurrentUserId();

@@ -58,18 +58,19 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     const { setPresence, setTyping } = usePresenceStore.getState();
 
     // This transformer is for WS messages ONLY.
+    // It correctly parses the payload from your Python consumer.
     const transformWsMessage = (wsMsg: any): Message => {
         const senderId = wsMsg.sender_id;
     
         return {
           id: wsMsg.id.toString(),
-          chatId: wsMsg.chat_id.toString(),
+          chatId: wsMsg.chat_id.toString(), // CRITICAL: Use chat_id from payload
           sender: senderId === currentUserId ? 'me' : 'contact',
           type: wsMsg.image ? 'image' : 'text',
-          text: wsMsg.message || '',
+          text: wsMsg.message || '', // CRITICAL: Use 'message' field for content
           imageUrl: wsMsg.image || null,
           timestamp: new Date(wsMsg.created_at.replace(' ', 'T') + 'Z'), // Make it ISO compliant
-          status: 'sent',
+          status: 'sent', // Default status, can be updated later
         };
     };
 
@@ -79,13 +80,14 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (ws.current) {
         ws.current.onclose = null; 
+        console.log(`WebSocket closing connection for chat: ${chatId}`);
         ws.current.close();
-        console.log(`WebSocket connection closed on cleanup for chat: ${chatId}`);
       }
       ws.current = null;
     };
 
     const connect = () => {
+      // Prevent multiple connections
       if (!isComponentMounted || ws.current) return;
       
       const token = localStorage.getItem("access_token");
@@ -150,7 +152,9 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         ws.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        if (event.code !== 1000 && isComponentMounted && !reconnectTimeoutRef.current) {
+        // Don't auto-reconnect if it was a normal closure (e.g., component unmount)
+        if (event.code !== 1000 && isComponentMounted) {
+            if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
@@ -166,7 +170,10 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing]); // Dependencies are stable
+  // The dependency array is crucial. It ensures this effect only re-runs
+  // if the chatId changes, preventing the connection loop.
+  // queryClient, sendPing, etc., are stable and don't need to be included.
+  }, [chatId]); 
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }
