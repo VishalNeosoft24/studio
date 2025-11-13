@@ -82,15 +82,20 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       const data = JSON.parse(messageEvent.data);
       console.log("📩 WS received:", data);
 
-      // Handle new messages (catches both "chat_message" and "chat.message")
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
         const newMessage = transformApiMessage(data.message);
         if (newMessage.chatId === chat.id) {
-          queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => [...oldMessages, newMessage]);
+          queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages) => {
+              const currentMessages = oldMessages || [];
+              // Avoid adding duplicate messages
+              if (currentMessages.some(msg => msg.id === newMessage.id)) {
+                  return currentMessages;
+              }
+              return [...currentMessages, newMessage];
+          });
         }
-        queryClient.invalidateQueries({ queryKey: ['chats'], exact: true }); // To update last message in chat list
+        queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
       } 
-      // Handle delivery status updates
       else if (data.type === 'delivery_status') {
         queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
           oldMessages.map(m =>
@@ -100,14 +105,11 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           )
         );
       }
-      // Handle presence updates (online/offline)
       else if (data.type === 'presence_update') {
         setPresence(data.user_id, data.is_online, data.last_seen);
         queryClient.invalidateQueries({queryKey: ['chats']});
       }
-      // Handle typing indicators
       else if (data.type === 'typing') {
-        // Ensure we don't show typing indicator for the current user
         if (data.user_id !== currentUserId) {
             setTyping(chat.id, data.user_id, data.is_typing);
         }
