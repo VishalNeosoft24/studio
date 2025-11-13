@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import type { Chat } from '@/types';
 import ChatList from '@/components/app/chat-list';
 import ChatWindow from '@/components/app/chat-window';
@@ -29,7 +29,6 @@ function ChatListSkeleton() {
 }
 
 export default function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -38,29 +37,22 @@ export default function ChatPage() {
     queryFn: getChats,
   });
 
-  // This effect handles the initial deep-link from the contacts page.
-  useEffect(() => {
-    const chatIdFromUrl = searchParams.get('chatId');
-    if (chatIdFromUrl) {
-      // If chats are loaded, verify the chat exists before setting it.
-      if (chats && chats.some(c => c.id.toString() === chatIdFromUrl)) {
-        setSelectedChatId(chatIdFromUrl);
-        // Clean the URL to prevent re-triggering on refresh
-        // Using router.replace instead of router.push to not add to history
-        router.replace('/chat', { scroll: false });
-      }
-    }
-  }, [searchParams, chats, router]);
+  const selectedChatId = useMemo(() => searchParams.get('chatId'), [searchParams]);
 
   const handleSelectChat = (id: string) => {
-    setSelectedChatId(id);
+    // Update the URL to reflect the selected chat. This is the single source of truth.
+    router.push(`/chat?chatId=${id}`);
   };
 
   const handleCloseChat = () => {
-    setSelectedChatId(null);
+    // Clear the URL parameter to close the chat window.
+    router.push('/chat');
   };
 
-  const selectedChat = chats?.find(c => c.id.toString() === selectedChatId);
+  const selectedChat = useMemo(() => {
+    if (!selectedChatId || !chats) return undefined;
+    return chats.find(c => c.id.toString() === selectedChatId);
+  }, [chats, selectedChatId]);
 
   return (
     <div className="flex h-screen w-screen bg-secondary overflow-hidden">
