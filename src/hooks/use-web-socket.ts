@@ -21,8 +21,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const currentUserId = getCurrentUserId();
-
+  
   const sendRaw = useCallback((payload: object) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(payload));
@@ -55,6 +54,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     }
     
     let isComponentMounted = true;
+    const currentUserId = getCurrentUserId();
     const { setPresence, setTyping } = usePresenceStore.getState();
 
     // This transformer is for WS messages ONLY.
@@ -166,7 +166,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing, currentUserId]); 
+  }, [chatId, queryClient, sendPing]); 
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }
