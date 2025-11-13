@@ -64,10 +64,10 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     
         return {
           id: wsMsg.id.toString(),
-          chatId: wsMsg.chat_id.toString(), // CRITICAL: Use chat_id from payload
+          chatId: wsMsg.chat_id.toString(), // CRITICAL FIX: Use chat_id from the payload
           sender: senderId === currentUserId ? 'me' : 'contact',
           type: wsMsg.image ? 'image' : 'text',
-          text: wsMsg.message || '', // CRITICAL: Use 'message' field for content
+          text: wsMsg.message || '',
           imageUrl: wsMsg.image || null,
           timestamp: new Date(wsMsg.created_at.replace(' ', 'T') + 'Z'), // Make it ISO compliant
           status: 'sent', // Default status, can be updated later
@@ -87,7 +87,6 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     };
 
     const connect = () => {
-      // Prevent multiple connections
       if (!isComponentMounted || ws.current) return;
       
       const token = localStorage.getItem("access_token");
@@ -152,7 +151,6 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         ws.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        // Don't auto-reconnect if it was a normal closure (e.g., component unmount)
         if (event.code !== 1000 && isComponentMounted) {
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             console.log('Attempting to reconnect in 3 seconds...');
@@ -170,10 +168,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  // The dependency array is crucial. It ensures this effect only re-runs
-  // if the chatId changes, preventing the connection loop.
-  // queryClient, sendPing, etc., are stable and don't need to be included.
-  }, [chatId]); 
+  }, [chatId, queryClient, sendPing]); 
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }
