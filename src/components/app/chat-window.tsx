@@ -77,7 +77,10 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  const handleWebSocketMessage = useCallback((messageEvent: MessageEvent) => {
+  // By NOT using useCallback, this function is recreated on every render,
+  // guaranteeing it closes over the most recent `chat.id`. This is the
+  // definitive fix for the stale closure issue that prevented real-time updates.
+  const handleWebSocketMessage = (messageEvent: MessageEvent) => {
     try {
       const data = JSON.parse(messageEvent.data);
       console.log("📩 WS received:", data);
@@ -88,7 +91,6 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
         if (String(newMessage.chatId) === String(chat.id)) {
             queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages) => {
                 const existingMessages = oldMessages ?? [];
-                // Prevent adding duplicate messages
                 if (existingMessages.some(msg => msg.id === newMessage.id)) {
                     return existingMessages;
                 }
@@ -117,7 +119,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     } catch (e) {
       console.error('Failed to parse incoming WebSocket message', e);
     }
-  }, [chat.id, queryClient, currentUserId, setPresence, setTyping]);
+  };
 
   const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
 
