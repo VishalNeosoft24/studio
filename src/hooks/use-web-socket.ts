@@ -27,17 +27,15 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
       ws.current.send(JSON.stringify(payload));
       return true;
     }
-    console.error('WebSocket is not open. Cannot send message.');
+    console.error('WebSocket is not open. Cannot send data.');
     return false;
   }, []);
 
   const sendMessage = useCallback((text: string) => {
-    console.log("⬆️ WS sent (text):", text);
     return sendRaw({ message_type: "text", message: text });
   }, [sendRaw]);
   
   const sendImage = useCallback((image: string, caption: string) => {
-    console.log("⬆️ WS sent (image):", { message: caption, image: "..." });
     return sendRaw({ message_type: "image", image: image, message: caption });
   }, [sendRaw]);
 
@@ -58,8 +56,6 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
     const currentUserId = getCurrentUserId();
     const { setPresence, setTyping } = usePresenceStore.getState();
 
-    // The logic to transform the message now lives inside the hook's effect
-    // to ensure it never has stale dependencies.
     const transformWsMessage = (apiMsg: any): Message => {
         return {
             id: apiMsg?.id?.toString() || `temp-${Date.now()}`,
@@ -116,29 +112,24 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
-          // Handle chat messages
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const newMessage = transformWsMessage(data.message);
             
-            // Use functional update to ensure we're not using stale state
             queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
               const existingMessages = oldData ?? [];
               if (existingMessages.some(msg => msg.id === newMessage.id)) {
-                return existingMessages; // Avoid duplicates
+                return existingMessages;
               }
               return [...existingMessages, newMessage];
             });
-            // Invalidate chats list to update last message preview
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
-          // Handle other event types
           } else if (data.type === 'delivery_status') {
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
               oldData.map(m => m.id === data.message_id ? { ...m, status: data.status } : m)
             );
           } else if (data.type === 'presence_update') {
             setPresence(data.user_id, data.is_online, data.last_seen);
-            queryClient.invalidateQueries({queryKey: ['chats']});
           } else if (data.type === 'typing' && data.user_id !== currentUserId) {
             setTyping(String(chatId), data.user_id, data.is_typing);
           }

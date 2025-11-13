@@ -161,17 +161,10 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
 export function transformApiMessage(msg: any): Message {
     const currentUserId = getCurrentUserId();
     
-    // This function must correctly handle data from both:
-    // 1. The initial REST API fetch (`/api/chats/{id}/messages/`)
-    // 2. The real-time WebSocket broadcast (`type: 'chat.message'`)
-    
     const senderId = msg?.sender?.id ?? msg?.sender_id;
-    const content = msg?.content ?? msg?.message; // REST uses 'content', WS uses 'message'
+    const content = msg?.content ?? msg?.message;
     const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
     const imageUrl = msg?.image ?? null;
-    
-    // CRITICAL FIX: The WebSocket payload has `chat_id`, while the REST payload has `chat`.
-    // This now correctly handles both structures.
     const chatId = msg?.chat?.toString() ?? msg?.chat_id?.toString() ?? '';
   
     return {
@@ -182,7 +175,7 @@ export function transformApiMessage(msg: any): Message {
       text: content || '',
       imageUrl: imageUrl,
       timestamp: timestamp,
-      status: 'sent', // Default status, will be updated by WebSocket 'delivery_status' events
+      status: 'sent',
     };
 };
 
