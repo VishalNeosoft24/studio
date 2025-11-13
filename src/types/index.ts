@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 // For the UI, simplified
 export type User = {
     id: string | number;
