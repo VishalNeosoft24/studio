@@ -168,7 +168,7 @@ export function transformApiMessage(apiMsg: ApiMessage): Message {
 
     return {
       id: apiMsg.id.toString(),
-      chatId: apiMsg.chatId.toString(), 
+      chatId: apiMsg.chat.toString(), 
       sender: senderId === currentUserId ? 'me' : 'contact',
       type: imageUrl ? 'image' : 'text',
       text: content || '',

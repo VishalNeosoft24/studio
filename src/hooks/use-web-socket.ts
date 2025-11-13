@@ -32,6 +32,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   }, []);
 
   const sendMessage = useCallback((text: string) => {
+    console.log("⬆️ WS sent (text):", text);
     return sendRaw({ message_type: "text", message: text });
   }, [sendRaw]);
   
@@ -56,18 +57,18 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     const currentUserId = getCurrentUserId();
     const { setPresence, setTyping } = usePresenceStore.getState();
 
-    // This transformer is for WS messages ONLY. It correctly extracts chat_id.
+    // This transformer is for WS messages ONLY.
     const transformWsMessage = (wsMsg: any): Message => {
         const senderId = wsMsg.sender_id;
     
         return {
           id: wsMsg.id.toString(),
-          chatId: wsMsg.chat_id.toString(), // CRITICAL: Read chat_id from WS payload
+          chatId: wsMsg.chat_id.toString(),
           sender: senderId === currentUserId ? 'me' : 'contact',
           type: wsMsg.image ? 'image' : 'text',
           text: wsMsg.message || '',
           imageUrl: wsMsg.image || null,
-          timestamp: new Date(wsMsg.created_at),
+          timestamp: new Date(wsMsg.created_at.replace(' ', 'T') + 'Z'), // Make it ISO compliant
           status: 'sent',
         };
     };
@@ -115,24 +116,30 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
+          // Handle chat messages
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const newMessage = transformWsMessage(data.message);
             
+            // Use functional update to ensure we're not using stale state
             queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
               const existingMessages = oldData ?? [];
               if (existingMessages.some(msg => msg.id === newMessage.id)) {
-                return existingMessages;
+                return existingMessages; // Avoid duplicates
               }
               return [...existingMessages, newMessage];
             });
+            // Invalidate chats list to update last message preview
+            queryClient.invalidateQueries({ queryKey: ['chats'] });
 
+          // Handle other event types
           } else if (data.type === 'delivery_status') {
-             // Use chatId from the hook's scope as delivery status doesn't contain it
+            // Note: delivery_status from the backend doesn't contain chat_id, so we use the hook's scope.
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: data.status } : m)
+              oldData.map(m => m.id === String(data.message_id) ? { ...m, status: data.status } : m)
             );
           } else if (data.type === 'presence_update') {
             setPresence(data.user_id, data.is_online, data.last_seen);
+            queryClient.invalidateQueries({queryKey: ['chats']});
           } else if (data.type === 'typing' && data.user_id !== currentUserId) {
             setTyping(String(chatId), data.user_id, data.is_typing);
           }
@@ -148,7 +155,8 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         ws.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-        if(isComponentMounted && !reconnectTimeoutRef.current) {
+        // Do not reconnect automatically if the closure was intentional
+        if (event.code !== 1000 && isComponentMounted && !reconnectTimeoutRef.current) {
             console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
@@ -164,7 +172,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing]); // Dependencies are stable primitives
+  }, [chatId, queryClient, sendPing]); // Dependencies are stable
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }

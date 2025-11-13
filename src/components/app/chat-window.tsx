@@ -77,7 +77,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  // The hook is now self-contained. It handles all incoming messages internally.
+  // The hook is now self-contained and manages all real-time updates internally.
   const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, queryClient);
 
   useEffect(() => {
