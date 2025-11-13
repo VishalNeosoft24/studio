@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
@@ -76,7 +77,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  // The hook now internally handles message processing and cache updates.
+  // The hook is now self-contained. It handles all incoming messages internally.
   const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, queryClient);
 
   useEffect(() => {

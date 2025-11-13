@@ -1,5 +1,4 @@
 
-
 import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -158,24 +157,37 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
+/**
+ * Transforms a message from the API (REST or WebSocket) into a format the UI can use.
+ * This is now robust to handle both the initial fetch (camelCase) and WS broadcasts (snake_case).
+ */
 export function transformApiMessage(msg: any): Message {
     const currentUserId = getCurrentUserId();
     
+    // Handle both REST (sender.id) and WebSocket (sender_id) formats
     const senderId = msg?.sender?.id ?? msg?.sender_id;
+
+    // Handle both REST (content) and WebSocket (message) formats for message text
     const content = msg?.content ?? msg?.message;
+
+    // Handle both REST (created_at) and WebSocket (timestamp might be different) formats
     const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
+
     const imageUrl = msg?.image ?? null;
+
+    // This is the critical part: Handle chat ID from both possible sources
     const chatId = msg?.chat?.toString() ?? msg?.chat_id?.toString() ?? '';
-  
+
     return {
-      id: msg?.id?.toString() || `temp-${Date.now()}`,
+      id: msg.id.toString(),
       chatId: chatId,
       sender: senderId === currentUserId ? 'me' : 'contact',
       type: imageUrl ? 'image' : 'text',
       text: content || '',
       imageUrl: imageUrl,
       timestamp: timestamp,
-      status: 'sent',
+      // Default status, can be updated by delivery receipts
+      status: 'sent', 
     };
 };
 
