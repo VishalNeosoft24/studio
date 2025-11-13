@@ -84,15 +84,16 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
         const newMessage = transformApiMessage(data.message);
-        if (newMessage.chatId === chat.id) {
-          queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages) => {
-              const currentMessages = oldMessages || [];
-              // Avoid adding duplicate messages
-              if (currentMessages.some(msg => msg.id === newMessage.id)) {
-                  return currentMessages;
-              }
-              return [...currentMessages, newMessage];
-          });
+        
+        // RELIABLE ID COMPARISON - This is the fix.
+        if (String(newMessage.chatId) === String(chat.id)) {
+            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
+                // Avoid adding duplicate messages
+                if (oldMessages.some(msg => msg.id === newMessage.id)) {
+                    return oldMessages;
+                }
+                return [...oldMessages, newMessage];
+            });
         }
         queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
       } 
@@ -111,7 +112,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       }
       else if (data.type === 'typing') {
         if (data.user_id !== currentUserId) {
-            setTyping(chat.id, data.user_id, data.is_typing);
+            setTyping(String(chat.id), data.user_id, data.is_typing);
         }
       }
 
@@ -157,7 +158,12 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   const formatLastSeen = (timestamp: string | null) => {
     if (!timestamp) return 'Offline';
-    return `Last seen ${formatDistanceToNowStrict(new Date(timestamp))} ago`;
+    try {
+        const date = new Date(timestamp);
+        return `Last seen ${formatDistanceToNowStrict(date)} ago`;
+    } catch (e) {
+        return 'Last seen recently';
+    }
   };
 
   const getStatusText = () => {

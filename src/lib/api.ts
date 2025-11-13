@@ -175,7 +175,7 @@ export function transformApiMessage(msg: any): Message {
       text: content || '',
       imageUrl: imageUrl, // Add image URL to the transformed message
       timestamp: timestamp,
-      status: senderId === currentUserId ? 'read' : undefined, // This is a simplification
+      status: 'sent', // Default to sent, will be updated by WS
     };
 };
 
