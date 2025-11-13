@@ -63,10 +63,10 @@ export function useWebSocket(chatId: string | null | undefined, queryClient: Que
     const transformWsMessage = (apiMsg: any): Message => {
         return {
             id: apiMsg?.id?.toString() || `temp-${Date.now()}`,
-            chatId: apiMsg.chat_id.toString(), // CRITICAL: This must match your backend payload
+            chatId: apiMsg.chat_id.toString(),
             sender: apiMsg.sender_id === currentUserId ? 'me' : 'contact',
             type: apiMsg.image ? 'image' : 'text',
-            text: apiMsg.message || '', // CRITICAL: This must match your backend payload
+            text: apiMsg.message || '',
             imageUrl: apiMsg.image || null,
             timestamp: apiMsg.created_at ? new Date(apiMsg.created_at) : new Date(),
             status: 'sent',
