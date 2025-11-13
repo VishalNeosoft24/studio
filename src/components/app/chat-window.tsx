@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import { format, isToday, isYesterday, isSameDay, formatDistanceToNowStrict } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getMessages, getCurrentUserId, transformApiMessage, getChats } from '@/lib/api';
+import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
 import { usePresenceStore } from '@/stores/use-presence-store';
@@ -64,7 +64,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   const chatDisplayName = chat.chat_display_name;
 
-  const { isOnline, lastSeen, isTyping, setPresence, setTyping } = usePresenceStore();
+  const { isOnline, lastSeen, isTyping } = usePresenceStore();
 
   const isOtherUserOnline = isOnline(otherParticipant?.id);
   const otherUserLastSeen = lastSeen(otherParticipant?.id);
@@ -77,50 +77,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  const handleWebSocketMessage = useCallback((messageEvent: MessageEvent) => {
-    try {
-      const data = JSON.parse(messageEvent.data);
-      console.log("📩 WS received:", data);
-
-      if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        const newMessage = transformApiMessage(data.message);
-        
-        if (String(newMessage.chatId) === String(chat.id)) {
-            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages) => {
-                const existingMessages = oldMessages ?? [];
-                if (existingMessages.some(msg => msg.id === newMessage.id)) {
-                    return existingMessages; // Message already exists, do nothing
-                }
-                return [...existingMessages, newMessage]; // Add the new message
-            });
-        }
-        queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
-      } 
-      else if (data.type === 'delivery_status') {
-        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
-          oldMessages.map(m =>
-            m.id === data.message_id
-              ? { ...m, status: data.status }
-              : m
-          )
-        );
-      }
-      else if (data.type === 'presence_update') {
-        setPresence(data.user_id, data.is_online, data.last_seen);
-        queryClient.invalidateQueries({queryKey: ['chats']});
-      }
-      else if (data.type === 'typing') {
-        if (data.user_id !== currentUserId) {
-            setTyping(String(chat.id), data.user_id, data.is_typing);
-        }
-      }
-
-    } catch (e) {
-      console.error('Failed to parse incoming WebSocket message', e);
-    }
-  }, [chat.id, queryClient, setPresence, setTyping, currentUserId]);
-  
-  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
+  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, queryClient);
 
   useEffect(() => {
     if (scrollViewportRef.current) {

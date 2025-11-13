@@ -2,6 +2,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { QueryClient } from '@tanstack/react-query';
+import { usePresenceStore } from '@/stores/use-presence-store';
+import { transformApiMessage, getCurrentUserId } from '@/lib/api';
+import type { Message } from '@/types';
+
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 
@@ -12,7 +17,7 @@ type WebSocketHook = {
   isConnected: boolean;
 };
 
-export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) => void): WebSocketHook {
+export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocketHook {
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -64,7 +69,7 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         ws.current.onclose = null; 
         ws.current.close();
         ws.current = null;
-        console.log("WebSocket connection closed on component unmount.");
+        console.log("WebSocket connection closed on unmount for chat:", chatId);
       }
     };
 
@@ -98,13 +103,55 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
             reconnectTimeoutRef.current = null;
         }
 
-        // Start sending pings every 30 seconds to keep connection alive
         pingIntervalRef.current = setInterval(sendPing, 30000);
       };
 
       socket.onmessage = (event) => {
         if (!isComponentMounted) return;
-        onMessage(event);
+
+        try {
+            const data = JSON.parse(event.data);
+            console.log("📩 WS received:", data);
+            const { setPresence, setTyping } = usePresenceStore.getState();
+            const currentUserId = getCurrentUserId();
+
+            if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
+                const newMessage = transformApiMessage(data.message);
+                
+                if (String(newMessage.chatId) === String(chatId)) {
+                    queryClient.setQueryData<Message[]>(['messages', chatId], (oldMessages) => {
+                        const existingMessages = oldMessages ?? [];
+                        if (existingMessages.some(msg => msg.id === newMessage.id)) {
+                            return existingMessages;
+                        }
+                        return [...existingMessages, newMessage];
+                    });
+                     // Also invalidate the main chats query to update last message preview
+                    queryClient.invalidateQueries({ queryKey: ['chats'], exact: true });
+                }
+            } 
+            else if (data.type === 'delivery_status') {
+                queryClient.setQueryData<Message[]>(['messages', chatId], (oldMessages = []) =>
+                oldMessages.map(m =>
+                    m.id === data.message_id
+                    ? { ...m, status: data.status }
+                    : m
+                )
+                );
+            }
+            else if (data.type === 'presence_update') {
+                setPresence(data.user_id, data.is_online, data.last_seen);
+                queryClient.invalidateQueries({queryKey: ['chats']});
+            }
+            else if (data.type === 'typing') {
+                if (data.user_id !== currentUserId) {
+                    setTyping(String(chatId), data.user_id, data.is_typing);
+                }
+            }
+
+        } catch (e) {
+            console.error('Failed to parse incoming WebSocket message', e);
+        }
       };
 
       socket.onclose = (event) => {
@@ -127,14 +174,14 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
       socket.onerror = (error) => {
         if (!isComponentMounted) return;
         console.error('WebSocket error:', error);
-        socket.close(); // This will trigger onclose and handle reconnection
+        socket.close();
       };
     };
 
     connect();
 
     return cleanup;
-  }, [chatId, onMessage, sendPing]);
+  }, [chatId, queryClient, sendPing]);
 
   return { sendMessage, sendImage, sendTyping, isConnected };
 }
