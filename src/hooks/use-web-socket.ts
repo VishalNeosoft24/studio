@@ -45,24 +45,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     }
     
     let isComponentMounted = true;
-    const currentUserId = getCurrentUserId();
     
-    const transformWsMessage = (wsMsg: any): Message => {
-      // The backend sends 'YYYY-MM-DD HH:MM:SS', which needs a 'T' for JS Date
-      const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
-      
-      return {
-        id: wsMsg.id.toString(),
-        chatId: wsMsg.chat_id.toString(),
-        sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
-        type: wsMsg.message_type === 'image' ? 'image' : 'text',
-        text: wsMsg.message || '',
-        imageUrl: wsMsg.image || null,
-        timestamp: new Date(validTimestamp),
-        status: 'sent', // Initially 'sent', will be updated by delivery status
-      };
-    };
-
     const cleanup = () => {
       isComponentMounted = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -105,13 +88,29 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
           console.log("📩 WS received:", data);
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-            const newMessage = transformWsMessage(data.message);
+            const wsMsg = data.message;
             
-            queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
+            queryClient.setQueryData<Message[]>(['messages', wsMsg.chat_id.toString()], (oldData) => {
+              const currentUserId = getCurrentUserId(); // Get the ID *inside* the update function
               const existingMessages = oldData ?? [];
-              if (existingMessages.some(msg => msg.id === newMessage.id)) {
+              
+              if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
                 return existingMessages;
               }
+
+              const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
+              
+              const newMessage: Message = {
+                id: wsMsg.id.toString(),
+                chatId: wsMsg.chat_id.toString(),
+                sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
+                type: wsMsg.message_type === 'image' ? 'image' : 'text',
+                text: wsMsg.message || '',
+                imageUrl: wsMsg.image || null,
+                timestamp: new Date(validTimestamp),
+                status: 'sent',
+              };
+
               return [...existingMessages, newMessage];
             });
             queryClient.invalidateQueries({ queryKey: ['chats'] });
