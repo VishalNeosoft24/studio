@@ -91,13 +91,15 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
             const wsMsg = data.message;
             
             queryClient.setQueryData<Message[]>(['messages', wsMsg.chat_id.toString()], (oldData) => {
-              const currentUserId = getCurrentUserId(); // Get the ID *inside* the update function
-              const existingMessages = oldData ?? [];
+              const currentUserId = getCurrentUserId();
+              // Ensure oldData is an array and create a new copy
+              const existingMessages = oldData ? [...oldData] : [];
               
               if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
                 return existingMessages;
               }
 
+              // The timestamp from your backend might not be a valid ISO string for all browsers
               const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
               
               const newMessage: Message = {
@@ -108,11 +110,15 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
                 text: wsMsg.message || '',
                 imageUrl: wsMsg.image || null,
                 timestamp: new Date(validTimestamp),
-                status: 'sent',
+                status: 'sent', // Or 'read' if it's from the other user
               };
-
+              
+              // Return a new array with the new message
               return [...existingMessages, newMessage];
             });
+
+            // This tells React Query that the 'chats' list is stale and needs refetching,
+            // which is useful for updating the last message preview in the chat list.
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
           } else if (data.type === 'delivery_status') {
