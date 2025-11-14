@@ -87,7 +87,6 @@ export type WsMessagePayload = {
 // Represents a message transformed for the UI
 export type Message = {
   id: string;
-  chatId: string;
   sender: 'me' | 'contact'; // Simplified for UI purposes
   type: 'text' | 'image';
   text: string;

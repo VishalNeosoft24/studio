@@ -157,21 +157,24 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
+export function transformApiMessage(msg: any): Message {
     const currentUserId = getCurrentUserId();
+    // Handle both REST and WebSocket message structures
+    const senderId = msg?.sender?.id ?? msg?.sender_id;
+    const content = msg?.content ?? msg?.message;
+    const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
+    const imageUrl = msg?.image ?? null; // Handle image URL
   
     return {
-      id: apiMsg.id.toString(),
-      chatId: chatId,
-      sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
-      type: apiMsg.message_type === 'image' ? 'image' : 'text',
-      text: apiMsg.content || '',
-      imageUrl: apiMsg.image || null,
-      timestamp: new Date(apiMsg.created_at),
-      status: apiMsg.sender.id === currentUserId ? 'read' : undefined, // This is a simplification
+      id: msg?.id?.toString() || `temp-${Date.now()}`,
+      sender: senderId === currentUserId ? 'me' : 'contact',
+      type: imageUrl ? 'image' : 'text', // Infer type from image presence
+      text: content || '',
+      imageUrl: imageUrl, // Add image URL to the transformed message
+      timestamp: timestamp,
+      status: senderId === currentUserId ? 'read' : undefined, // This is a simplification
     };
 };
-
 
 export async function login(username: string, password: string) {
     console.log('Attempting login for:', username);
