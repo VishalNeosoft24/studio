@@ -1,8 +1,20 @@
+'use client';
 
-import { redirect } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
-  // Redirect any traffic from the root path '/' to the '/login' page.
-  // This is a server-side redirect.
-  redirect('/login');
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace('/login');
+  }, [router]);
+
+  // Render a simple loading state while the redirect is happening
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-background">
+      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    </div>
+  );
 }

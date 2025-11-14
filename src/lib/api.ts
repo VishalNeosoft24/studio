@@ -17,8 +17,6 @@ export function getCurrentUserId(): number | null {
   if (!token) return null;
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
-    // The user ID is in the 'user_id' field in the JWT payload
-    // Ensure it's treated as a number
     const userId = payload.user_id;
     return typeof userId === 'string' ? parseInt(userId, 10) : userId;
   } catch (error) {
@@ -32,7 +30,6 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = getToken();
 
-  // Check if body is FormData, if so, don't set Content-Type header
   const isFormData = options.body instanceof FormData;
 
   const headers: HeadersInit = {
@@ -44,7 +41,6 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
-    // Special handling for 401 Unauthorized to redirect to login
     if (response.status === 401 && typeof window !== 'undefined') {
        console.error("Unauthorized request, redirecting to login.");
        logout();
@@ -54,14 +50,8 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     throw new Error(errorData.detail || `API Error (${response.status})`);
   }
 
-  // Handle empty response bodies for methods like POST/DELETE
   if (response.status === 204 || response.headers.get('Content-Length') === '0') {
       return null;
-  }
-
-  // Handle cases where creating a resource might return an existing one (200 OK) or a new one (201 Created)
-  if (response.status === 200 || response.status === 201) {
-    return response.json();
   }
   
   return response.json();
@@ -101,7 +91,6 @@ export async function getChats(): Promise<Chat[]> {
 }
 
 export async function createChat(payload: CreateChatPayload): Promise<Chat> {
-  // This can return a 200 (existing) or 201 (new), which apiFetch handles.
   return await apiFetch('/chats/', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -111,12 +100,11 @@ export async function createChat(payload: CreateChatPayload): Promise<Chat> {
 export async function getContacts(): Promise<Contact[]> {
     const apiContacts: ApiContact[] = await apiFetch("/contacts/");
     
-    // Transform the API response into the flat structure our UI expects
     return apiContacts.map(item => {
         if (item.is_registered && item.contact) {
             return {
                 id: item.contact.id.toString(),
-                name: item.name, // Use the user-defined name for the contact
+                name: item.name,
                 avatarUrl: item.contact.profile_picture_url,
                 isMuted: item.is_muted,
                 about: item.contact.about_status,
@@ -124,8 +112,8 @@ export async function getContacts(): Promise<Contact[]> {
             };
         } else {
             return {
-                id: `phone-${item.phone_number}`, // Use phone number for a unique ID for non-registered
-                name: item.name, // Use the name from phone contacts
+                id: `phone-${item.phone_number}`,
+                name: item.name,
                 avatarUrl: null,
                 isMuted: false,
                 about: `Invite ${item.name} to Chatterbox`,
@@ -157,22 +145,18 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-export function transformApiMessage(msg: any): Message {
+export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
     const currentUserId = getCurrentUserId();
-    // Handle both REST and WebSocket message structures
-    const senderId = msg?.sender?.id ?? msg?.sender_id;
-    const content = msg?.content ?? msg?.message;
-    const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
-    const imageUrl = msg?.image ?? null; // Handle image URL
   
     return {
-      id: msg?.id?.toString() || `temp-${Date.now()}`,
-      sender: senderId === currentUserId ? 'me' : 'contact',
-      type: imageUrl ? 'image' : 'text', // Infer type from image presence
-      text: content || '',
-      imageUrl: imageUrl, // Add image URL to the transformed message
-      timestamp: timestamp,
-      status: senderId === currentUserId ? 'read' : undefined, // This is a simplification
+      id: apiMsg.id.toString(),
+      chatId: chatId,
+      sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
+      type: apiMsg.message_type === 'image' ? 'image' : 'text',
+      text: apiMsg.content || '',
+      imageUrl: apiMsg.image || null,
+      timestamp: new Date(apiMsg.created_at),
+      status: apiMsg.sender.id === currentUserId ? 'read' : undefined, // This is a simplification
     };
 };
 
@@ -215,7 +199,6 @@ export async function register(payload: RegisterPayload): Promise<User> {
     const data = await response.json();
     
     if (!response.ok) {
-        // Extract a generic or specific error message from the backend response
         const errorMsg = data.detail || Object.values(data).flat().join(' ') || 'Registration failed.';
         throw new Error(errorMsg);
     }

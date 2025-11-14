@@ -1,13 +1,17 @@
 
 import create from 'zustand';
-import { PresenceState } from '@/types';
+import type { PresenceState } from '@/types';
 
 export const usePresenceStore = create<PresenceState>((set, get) => ({
   onlineUsers: {},
   typingUsers: {},
 
   isOnline: (userId: number) => !!get().onlineUsers[userId],
-  lastSeen: (userId: number) => get().onlineUsers[userId]?.last_seen || null,
+  
+  lastSeen: (userId: number) => {
+    const user = get().onlineUsers[userId];
+    return user ? user.last_seen : null;
+  },
 
   isTyping: (chatId: string, userId: number) => {
     const typingInChat = get().typingUsers[chatId] || [];
@@ -20,11 +24,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
       if (isOnline) {
         newOnlineUsers[userId] = { last_seen: null };
       } else {
-        // Only update last_seen if user is going offline
         if (newOnlineUsers[userId]) {
-            newOnlineUsers[userId].last_seen = lastSeen;
+          delete newOnlineUsers[userId];
         }
-        delete newOnlineUsers[userId];
       }
       return { onlineUsers: newOnlineUsers };
     });
@@ -34,21 +36,20 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
     set(state => {
       const newTypingUsers = { ...state.typingUsers };
       let typingInChat = newTypingUsers[chatId] ? [...newTypingUsers[chatId]] : [];
+      const currentUserId = get().onlineUsers ? Object.keys(get().onlineUsers).map(Number).find(id => id !== userId) : undefined;
 
       if (isTyping) {
-        // Add user if not already in the list
-        if (!typingInChat.includes(userId)) {
+        if (!typingInChat.includes(userId) && userId !== currentUserId) {
           typingInChat.push(userId);
         }
       } else {
-        // Remove user from the list
         typingInChat = typingInChat.filter(id => id !== userId);
       }
 
       if (typingInChat.length > 0) {
         newTypingUsers[chatId] = typingInChat;
       } else {
-        delete newTypingUsers[chatId]; // Clean up if no one is typing
+        delete newTypingUsers[chatId];
       }
       
       return { typingUsers: newTypingUsers };

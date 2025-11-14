@@ -1,5 +1,4 @@
 
-
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -87,6 +86,7 @@ export type WsMessagePayload = {
 // Represents a message transformed for the UI
 export type Message = {
   id: string;
+  chatId: string;
   sender: 'me' | 'contact'; // Simplified for UI purposes
   type: 'text' | 'image';
   text: string;
@@ -122,4 +122,20 @@ export type Contact = {
     isMuted: boolean;
     about: string | null;
     isRegistered: boolean;
+};
+
+
+// For Presence
+export type OnlineUser = {
+  last_seen: string | null;
+};
+
+export type PresenceState = {
+  onlineUsers: { [userId: number]: OnlineUser };
+  typingUsers: { [chatId: string]: number[] };
+  isOnline: (userId: number) => boolean;
+  lastSeen: (userId: number) => string | null;
+  isTyping: (chatId: string, userId: number) => boolean;
+  setPresence: (userId: number, isOnline: boolean, lastSeen: string | null) => void;
+  setTyping: (chatId: string, userId: number, isTyping: boolean) => void;
 };
