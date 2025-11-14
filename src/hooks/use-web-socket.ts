@@ -11,7 +11,7 @@ type WebSocketHook = {
   isConnected: boolean;
 };
 
-export function useWebSocket(chatId: string | null, onMessage: (event: MessageEvent) => void): WebSocketHook {
+export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) => void): WebSocketHook {
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,7 +95,6 @@ export function useWebSocket(chatId: string | null, onMessage: (event: MessageEv
         setIsConnected(false);
         ws.current = null;
         if(isComponentMounted && !reconnectTimeoutRef.current) {
-            console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
       };

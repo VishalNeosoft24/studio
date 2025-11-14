@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getMessages, getCurrentUserId, transformApiMessage, transformWsMessage } from '@/lib/api';
+import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
 
@@ -48,6 +48,7 @@ interface ChatWindowProps {
 function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isTyping, setIsTyping] = useState(false);
   
   const [isContactInfoOpen, setContactInfoOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -66,7 +67,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
-      select: (apiMessages) => apiMessages.map(msg => transformApiMessage(msg, chat.id)).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      select: (apiMessages) => apiMessages.map(transformApiMessage).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
       staleTime: 5000,
   });
 
@@ -76,25 +77,14 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       console.log("📩 WS received:", data);
 
       if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        const newMessage = transformWsMessage(data.message);
-        
-        // Check if the message belongs to the currently active chat
-        if (newMessage.chatId === chat.id) {
-            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
-                // Avoid adding duplicates
-                if (oldMessages.some(msg => msg.id === newMessage.id)) {
-                    return oldMessages;
-                }
-                return [...oldMessages, newMessage];
-            });
-        }
-        // Invalidate chats list to update the last message preview
-        queryClient.invalidateQueries({ queryKey: ['chats'] });
-
+        // Optimistically update the UI, then invalidate to refetch and confirm
+        const newMessage = transformApiMessage(data.message);
+        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => [...oldMessages, newMessage]);
+        queryClient.invalidateQueries({ queryKey: ['messages', chat.id], exact: true });
       } else if (data.type === 'delivery_status') {
         queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
           oldMessages.map(m =>
-            m.id === data.message_id.toString()
+            m.id === data.message_id
               ? { ...m, status: data.status }
               : m
           )
@@ -115,7 +105,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             }
         }, 100);
     }
-  }, [messages.length, chat.id]);
+  }, [messages, chat.id]);
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
@@ -133,21 +123,14 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
 
   const getStatusIcon = (status?: 'sent' | 'delivered' | 'read') => {
     switch (status) {
-      case 'read': return <CheckCheck className="h-4 w-4 text-blue-500" />;
+      case 'read': return <CheckCheck className="h-4 w-4 text-accent" />;
       case 'delivered': return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
       case 'sent': return <Check className="h-4 w-4 text-muted-foreground" />;
       default: return null;
     }
   }
 
-  const getStatusText = () => {
-    if (isBlocked) return 'Blocked';
-    if (!isConnected) return 'Connecting...';
-    // Presence is removed, so we just show a generic status or nothing
-    return 'Online';
-  }
-
-  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, is_online: false, last_seen: null };
+  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null };
 
   return (
     <>
@@ -176,7 +159,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{chatDisplayName} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{getStatusText()}</p>
+            <p className="text-xs text-muted-foreground">{isBlocked ? 'Blocked' : isTyping ? 'typing...' : (isConnected ? 'Online' : 'Connecting...')}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

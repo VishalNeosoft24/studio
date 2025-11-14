@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload, WsMessagePayload } from '@/types';
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -83,7 +83,7 @@ export async function uploadProfilePicture(file: File): Promise<{ profile_pictur
     const formData = new FormData();
     formData.append('file', file);
 
-    return await apiFetch('/auth/profile-picture/', {
+    return await apiFetch('/auth/upload-profile/', {
         method: 'POST',
         body: formData,
     });
@@ -157,46 +157,24 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-/**
- * Transforms a message from the initial REST API fetch into a format the UI can use.
- * This is for OLD messages loaded via HTTP.
- */
-export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
+export function transformApiMessage(msg: any): Message {
     const currentUserId = getCurrentUserId();
-    
+    // Handle both REST and WebSocket message structures
+    const senderId = msg?.sender?.id ?? msg?.sender_id;
+    const content = msg?.content ?? msg?.message;
+    const timestamp = msg?.created_at ? new Date(msg.created_at) : new Date();
+    const imageUrl = msg?.image ?? null; // Handle image URL
+  
     return {
-      id: apiMsg.id.toString(),
-      chatId: chatId,
-      sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
-      type: apiMsg.image ? 'image' : 'text',
-      text: apiMsg.content || '',
-      imageUrl: apiMsg.image || null,
-      timestamp: new Date(apiMsg.created_at),
-      status: 'read', // Assume old messages are read
+      id: msg?.id?.toString() || `temp-${Date.now()}`,
+      sender: senderId === currentUserId ? 'me' : 'contact',
+      type: imageUrl ? 'image' : 'text', // Infer type from image presence
+      text: content || '',
+      imageUrl: imageUrl, // Add image URL to the transformed message
+      timestamp: timestamp,
+      status: senderId === currentUserId ? 'read' : undefined, // This is a simplification
     };
 };
-
-/**
- * Transforms a message from the WebSocket into a format the UI can use.
- * This is for NEW messages arriving in real-time.
- */
-export function transformWsMessage(wsMsg: WsMessagePayload): Message {
-    const currentUserId = getCurrentUserId();
-
-    // The timestamp from the Python backend has a space, which needs to be replaced with 'T' to be a valid ISO string.
-    const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
-
-    return {
-      id: wsMsg.id.toString(),
-      chatId: wsMsg.chat_id.toString(),
-      sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
-      type: wsMsg.message_type,
-      text: wsMsg.message || '',
-      imageUrl: wsMsg.image || null,
-      timestamp: new Date(validTimestamp),
-      status: 'sent', // Initial status for a new message
-    };
-}
 
 
 export async function login(username: string, password: string) {
