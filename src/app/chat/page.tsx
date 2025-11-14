@@ -78,7 +78,6 @@ export default function ChatPage() {
           <ChatWindow
             key={selectedChat.id} // The key is crucial for re-rendering the component on chat change
             chat={selectedChat}
-            onCloseChat={handleCloseChat}
           />
         ) : (
           <ChatPlaceholder />

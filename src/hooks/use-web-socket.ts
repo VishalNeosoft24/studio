@@ -2,6 +2,9 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { getCurrentUserId } from '@/lib/api';
+import type { Message } from '@/types';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 
@@ -11,10 +14,29 @@ type WebSocketHook = {
   isConnected: boolean;
 };
 
-export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) => void): WebSocketHook {
+// This function transforms the WebSocket message payload into the Message type for the UI
+const transformWsMessage = (wsMsg: any): Message => {
+  const currentUserId = getCurrentUserId();
+  // Timestamps from python backend might have a space instead of 'T'
+  const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
+  
+  return {
+    id: wsMsg.id.toString(),
+    chatId: wsMsg.chat_id.toString(),
+    sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
+    type: wsMsg.message_type === 'image' ? 'image' : 'text',
+    text: wsMsg.message || '',
+    imageUrl: wsMsg.image || null,
+    timestamp: new Date(validTimestamp),
+    status: 'sent', // Default status for new messages
+  };
+};
+
+export function useWebSocket(chatId: string): WebSocketHook {
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const queryClient = useQueryClient();
 
   const sendMessage = useCallback((text: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -86,7 +108,34 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
 
       socket.onmessage = (event) => {
         if (!isComponentMounted) return;
-        onMessage(event);
+        
+        try {
+          const data = JSON.parse(event.data);
+          console.log("📩 WS received:", data);
+
+          if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
+            const newMessage = transformWsMessage(data.message);
+            
+            queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
+              const existingData = oldData ?? [];
+              // Prevent duplicates
+              if (existingData.some(msg => msg.id === newMessage.id)) {
+                return existingData;
+              }
+              return [...existingData, newMessage];
+            });
+            
+            // Invalidate chats list to update last message preview, etc.
+            queryClient.invalidateQueries({ queryKey: ['chats'] });
+
+          } else if (data.type === 'delivery_status') {
+             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
+              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: data.status } : m)
+            );
+          }
+        } catch (e) {
+          console.error('Failed to process incoming WebSocket message', e);
+        }
       };
 
       socket.onclose = (event) => {
@@ -119,7 +168,7 @@ export function useWebSocket(chatId: string, onMessage: (event: MessageEvent) =>
         console.log("WebSocket connection closed on component unmount.");
       }
     };
-  }, [chatId, onMessage]);
+  }, [chatId, queryClient]);
 
   return { sendMessage, sendImage, isConnected };
 }

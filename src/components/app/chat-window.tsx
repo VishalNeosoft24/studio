@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
@@ -42,12 +42,11 @@ const DateSeparator = ({ date }: { date: Date }) => {
 
 interface ChatWindowProps {
   chat: Chat;
-  onCloseChat: () => void;
 }
 
-function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
+function ChatWindow({ chat }: ChatWindowProps) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  
   const [isTyping, setIsTyping] = useState(false);
   
   const [isContactInfoOpen, setContactInfoOpen] = useState(false);
@@ -63,39 +62,15 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
   const chatDisplayName = chat.chat_display_name;
+
+  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id);
   
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
-      select: (apiMessages) => apiMessages.map(transformApiMessage).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      select: (apiMessages) => apiMessages.map(apiMsg => transformApiMessage(apiMsg, chat.id)).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
       staleTime: 5000,
   });
-
-  const handleWebSocketMessage = useCallback((messageEvent: MessageEvent) => {
-    try {
-      const data = JSON.parse(messageEvent.data);
-      console.log("📩 WS received:", data);
-
-      if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-        // Optimistically update the UI, then invalidate to refetch and confirm
-        const newMessage = transformApiMessage(data.message);
-        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => [...oldMessages, newMessage]);
-        queryClient.invalidateQueries({ queryKey: ['messages', chat.id], exact: true });
-      } else if (data.type === 'delivery_status') {
-        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
-          oldMessages.map(m =>
-            m.id === data.message_id
-              ? { ...m, status: data.status }
-              : m
-          )
-        );
-      }
-    } catch (e) {
-      console.error('Failed to parse incoming WebSocket message', e);
-    }
-  }, [chat.id, queryClient]);
-  
-  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -105,7 +80,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
             }
         }, 100);
     }
-  }, [messages, chat.id]);
+  }, [messages.length, chat.id]);
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
@@ -130,7 +105,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     }
   }
 
-  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null };
+  const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, is_online: false, last_seen: null };
 
   return (
     <>
