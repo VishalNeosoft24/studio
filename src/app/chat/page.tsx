@@ -43,11 +43,6 @@ export default function ChatPage() {
     router.push(`/chat?chatId=${id}`);
   };
 
-  const handleCloseChat = () => {
-    // Clear the chat selection by updating the URL
-    router.push('/chat');
-  };
-
   const selectedChat = useMemo(() => {
     if (!selectedChatId || !chats) return undefined;
     return chats.find(c => c.id.toString() === selectedChatId);
