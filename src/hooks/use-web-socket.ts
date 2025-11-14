@@ -18,7 +18,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentUserId = getCurrentUserId();
+  
 
   const sendRaw = useCallback((payload: object) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -35,10 +35,20 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   }, [sendRaw]);
   
   const sendImage = useCallback((image: string, caption: string) => {
+    console.log("⬆️ WS sent (image)");
     return sendRaw({ message_type: "image", image: image, message: caption });
   }, [sendRaw]);
 
-  const transformWsMessage = useCallback((wsMsg: any): Message => {
+  useEffect(() => {
+    if (!chatId) {
+      return;
+    }
+    
+    let isComponentMounted = true;
+    const currentUserId = getCurrentUserId();
+    
+    const transformWsMessage = (wsMsg: any): Message => {
+      // The backend sends 'YYYY-MM-DD HH:MM:SS', which needs a 'T' for JS Date
       const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
       
       return {
@@ -49,17 +59,10 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         text: wsMsg.message || '',
         imageUrl: wsMsg.image || null,
         timestamp: new Date(validTimestamp),
-        status: 'sent',
+        status: 'sent', // Initially 'sent', will be updated by delivery status
       };
-  }, [currentUserId]);
+    };
 
-  useEffect(() => {
-    if (!chatId) {
-      return;
-    }
-    
-    let isComponentMounted = true;
-    
     const cleanup = () => {
       isComponentMounted = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -146,7 +149,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, transformWsMessage]); 
+  }, [chatId, queryClient]); 
 
   return { sendMessage, sendImage, isConnected };
 }
