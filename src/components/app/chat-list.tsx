@@ -16,7 +16,6 @@ import { logout, getCurrentUserId, getProfile } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePresenceStore } from "@/stores/use-presence-store";
 
 
 type ChatListProps = {
@@ -31,7 +30,6 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
   const [searchQuery, setSearchQuery] = useState('');
   const [isProfileSheetOpen, setProfileSheetOpen] = useState(false);
   const currentUserId = getCurrentUserId();
-  const { isOnline } = usePresenceStore();
 
   const { data: user, isLoading: isLoadingUser } = useQuery<User>({
       queryKey: ['profile'],
@@ -59,7 +57,6 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
       name: chat.chat_display_name,
       avatarUrl: otherParticipant?.profile_picture_url,
       fallback: chat.chat_display_name?.[0]?.toUpperCase() || '?',
-      isOnline: otherParticipant ? isOnline(otherParticipant.id) : false,
     };
   };
 
@@ -132,7 +129,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
        <ScrollArea className="flex-1">
         <div className="p-0">
           {filteredChats.map((chat) => {
-            const { name, avatarUrl, fallback, isOnline } = getChatDisplayData(chat);
+            const { name, avatarUrl, fallback } = getChatDisplayData(chat);
             
             return (
               <button
@@ -149,9 +146,6 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                     <AvatarImage src={avatarUrl ?? undefined} />
                     <AvatarFallback>{fallback}</AvatarFallback>
                   </Avatar>
-                  {isOnline && (
-                     <div className="absolute bottom-0 right-3 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
-                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{name}</div>

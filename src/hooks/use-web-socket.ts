@@ -5,14 +5,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { Message } from '@/types';
 import { getCurrentUserId } from '@/lib/api';
-import { usePresenceStore } from '@/stores/use-presence-store';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 
 type WebSocketHook = {
   sendMessage: (message: string) => boolean;
   sendImage: (image: string, caption: string) => boolean;
-  sendTyping: (isTyping: boolean) => void;
   isConnected: boolean;
 };
 
@@ -20,8 +18,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const sendRaw = useCallback((payload: object) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify(payload));
@@ -40,14 +37,6 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     return sendRaw({ message_type: "image", image: image, message: caption });
   }, [sendRaw]);
 
-  const sendTyping = useCallback((isTyping: boolean) => {
-    sendRaw({ message_type: "typing", is_typing: isTyping });
-  }, [sendRaw]);
-
-  const sendPing = useCallback(() => {
-    sendRaw({ message_type: "ping" });
-  }, [sendRaw]);
-
   useEffect(() => {
     if (!chatId) {
       return;
@@ -55,10 +44,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     
     let isComponentMounted = true;
     const currentUserId = getCurrentUserId();
-    const { setPresence, setTyping } = usePresenceStore.getState();
 
-    // This transformer is for WS messages ONLY.
-    // It correctly parses the payload from your Python consumer.
     const transformWsMessage = (wsMsg: any): Message => {
         return {
           id: wsMsg.id.toString(),
@@ -67,14 +53,13 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
           type: wsMsg.image ? 'image' : 'text',
           text: wsMsg.message || '',
           imageUrl: wsMsg.image || null,
-          timestamp: new Date(wsMsg.created_at.replace(' ', 'T') + 'Z'), // Make it ISO compliant
-          status: 'sent', // Default status, can be updated later
+          timestamp: new Date(wsMsg.created_at.replace(' ', 'T') + 'Z'),
+          status: 'sent',
         };
     };
 
     const cleanup = () => {
       isComponentMounted = false;
-      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (ws.current) {
         ws.current.onclose = null; 
@@ -105,7 +90,6 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         console.log(`✅ WebSocket connection established for chat ${chatId}`);
         setIsConnected(true);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-        pingIntervalRef.current = setInterval(sendPing, 30000);
       };
 
       socket.onmessage = (event) => {
@@ -121,7 +105,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
             queryClient.setQueryData<Message[]>(['messages', newMessage.chatId], (oldData) => {
               const existingMessages = oldData ?? [];
               if (existingMessages.some(msg => msg.id === newMessage.id)) {
-                return existingMessages; // Avoid duplicates
+                return existingMessages;
               }
               return [...existingMessages, newMessage];
             });
@@ -131,11 +115,6 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
               oldData.map(m => m.id === String(data.message_id) ? { ...m, status: data.status } : m)
             );
-          } else if (data.type === 'presence_update') {
-            setPresence(data.user_id, data.is_online, data.last_seen);
-            queryClient.invalidateQueries({queryKey: ['chats']});
-          } else if (data.type === 'typing' && data.user_id !== currentUserId) {
-            setTyping(String(chatId), data.user_id, data.is_typing);
           }
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
@@ -147,8 +126,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         console.log(`❌ WebSocket connection closed: ${event.code}`, event.reason);
         setIsConnected(false);
         ws.current = null;
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-
+        
         if (event.code !== 1000 && isComponentMounted) {
             if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
             console.log('Attempting to reconnect in 3 seconds...');
@@ -166,7 +144,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient, sendPing]); 
+  }, [chatId, queryClient]); 
 
-  return { sendMessage, sendImage, sendTyping, isConnected };
+  return { sendMessage, sendImage, isConnected };
 }

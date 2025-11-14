@@ -15,12 +15,11 @@ import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
-import { format, isToday, isYesterday, isSameDay, formatDistanceToNowStrict } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
-import { usePresenceStore } from '@/stores/use-presence-store';
 
 
 const DateSeparator = ({ date }: { date: Date }) => {
@@ -63,12 +62,6 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const otherParticipant = chat.participants.find(p => p.id !== currentUserId) || chat.participants[0];
 
   const chatDisplayName = chat.chat_display_name;
-
-  const { isOnline, lastSeen, isTyping } = usePresenceStore();
-
-  const isOtherUserOnline = isOnline(otherParticipant?.id);
-  const otherUserLastSeen = lastSeen(otherParticipant?.id);
-  const isOtherUserTyping = isTyping(chat.id, otherParticipant?.id);
   
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
@@ -77,8 +70,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  // The hook is now self-contained and manages all real-time updates internally.
-  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, queryClient);
+  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id, queryClient);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -113,23 +105,10 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     }
   }
 
-  const formatLastSeen = (timestamp: string | null) => {
-    if (!timestamp) return 'Offline';
-    try {
-        const date = new Date(timestamp);
-        return `Last seen ${formatDistanceToNowStrict(date)} ago`;
-    } catch (e) {
-        return 'Last seen recently';
-    }
-  };
-
   const getStatusText = () => {
     if (isBlocked) return 'Blocked';
-    if (isOtherUserTyping) return 'typing...';
-    if (isOtherUserOnline) return 'Online';
-    if (otherUserLastSeen) return formatLastSeen(otherUserLastSeen);
     if (!isConnected) return 'Connecting...';
-    return 'Offline';
+    return 'Online';
   }
 
   const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, is_online: false, last_seen: null };
@@ -273,7 +252,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Alert>
         </CardFooter>
       ) : (
-        <MessageInput onSendMessage={sendMessage} onSendImage={sendImage} onTyping={sendTyping} isConnected={isConnected} />
+        <MessageInput onSendMessage={sendMessage} onSendImage={sendImage} isConnected={isConnected} />
       )}
     </Card>
     </>

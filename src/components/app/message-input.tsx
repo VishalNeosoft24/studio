@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,17 +15,15 @@ import CameraViewDialog from './camera-view-dialog';
 interface MessageInputProps {
   onSendMessage: (message: string) => boolean;
   onSendImage: (image: string, caption: string) => boolean;
-  onTyping: (isTyping: boolean) => void;
   isConnected: boolean;
 }
 
-export default function MessageInput({ onSendMessage, onSendImage, onTyping, isConnected }: MessageInputProps) {
+export default function MessageInput({ onSendMessage, onSendImage, isConnected }: MessageInputProps) {
   const { toast } = useToast();
   const [text, setText] = useState('');
   const [imageToSend, setImageToSend] = useState<string | null>(null);
   const [isCameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
@@ -43,12 +41,6 @@ export default function MessageInput({ onSendMessage, onSendImage, onTyping, isC
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!isConnected) return;
-    
-    if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-    }
-    onTyping(false);
 
     if (imageToSend) {
         // Sending an image with caption
@@ -102,27 +94,7 @@ export default function MessageInput({ onSendMessage, onSendImage, onTyping, isC
   
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setText(e.target.value);
-      
-      if (!typingTimeoutRef.current) {
-          onTyping(true);
-      } else {
-          clearTimeout(typingTimeoutRef.current);
-      }
-
-      typingTimeoutRef.current = setTimeout(() => {
-          onTyping(false);
-          typingTimeoutRef.current = null;
-      }, 3000); // User is considered "stopped typing" after 3 seconds of inactivity
   }
-  
-  useEffect(() => {
-    // Cleanup timeout on component unmount
-    return () => {
-        if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
-        }
-    }
-  }, []);
 
   return (
     <>

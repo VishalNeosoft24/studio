@@ -11,8 +11,6 @@ export type User = {
     about_status?: string | null;
     avatarUrl?: string | null; 
     about?: string; // a bit redundant
-    is_online?: boolean;
-    last_seen?: string | null;
 }
 
 export type UpdateProfilePayload = {
@@ -34,8 +32,6 @@ export type Participant = {
     phone_number: string;
     profile_picture_url: string | null;
     display_name?: string | null;
-    is_online?: boolean;
-    last_seen?: string | null;
 }
 
 export type Chat = {
@@ -116,15 +112,15 @@ export type Contact = {
     isRegistered: boolean;
 };
 
-export type PresenceState = {
-    onlineUsers: Record<number, { last_seen: string | null }>;
-    typingUsers: Record<string, number[]>; // { chatId: [userId1, userId2] }
+// This type is no longer needed after simplification
+// export type PresenceState = {
+//     onlineUsers: Record<number, { last_seen: string | null }>;
+//     typingUsers: Record<string, number[]>; // { chatId: [userId1, userId2] }
     
-    isOnline: (userId: number) => boolean;
-    lastSeen: (userId: number) => string | null;
-    isTyping: (chatId: string, userId: number) => boolean;
+//     isOnline: (userId: number) => boolean;
+//     lastSeen: (userId: number) => string | null;
+//     isTyping: (chatId: string, userId: number) => boolean;
 
-    setPresence: (userId: number, isOnline: boolean, lastSeen: string | null) => void;
-    setTyping: (chatId: string, userId: number, isTyping: boolean) => void;
-};
-    
+//     setPresence: (userId: number, isOnline: boolean, lastSeen: string | null) => void;
+//     setTyping: (chatId: string, userId: number, isTyping: boolean) => void;
+// };
