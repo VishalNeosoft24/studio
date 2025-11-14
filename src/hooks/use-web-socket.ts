@@ -18,6 +18,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentUserId = getCurrentUserId();
 
   const sendRaw = useCallback((payload: object) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -37,30 +38,28 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     return sendRaw({ message_type: "image", image: image, message: caption });
   }, [sendRaw]);
 
+  const transformWsMessage = useCallback((wsMsg: any): Message => {
+      const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
+      
+      return {
+        id: wsMsg.id.toString(),
+        chatId: wsMsg.chat_id.toString(),
+        sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
+        type: wsMsg.message_type === 'image' ? 'image' : 'text',
+        text: wsMsg.message || '',
+        imageUrl: wsMsg.image || null,
+        timestamp: new Date(validTimestamp),
+        status: 'sent',
+      };
+  }, [currentUserId]);
+
   useEffect(() => {
     if (!chatId) {
       return;
     }
     
     let isComponentMounted = true;
-    const currentUserId = getCurrentUserId();
-
-    const transformWsMessage = (wsMsg: any): Message => {
-        // The backend sends a space instead of a 'T' in the timestamp.
-        const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
-        
-        return {
-          id: wsMsg.id.toString(),
-          chatId: wsMsg.chat_id.toString(),
-          sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
-          type: wsMsg.message_type === 'image' ? 'image' : 'text',
-          text: wsMsg.message || '',
-          imageUrl: wsMsg.image || null,
-          timestamp: new Date(validTimestamp),
-          status: 'sent', // Initial status for new messages
-        };
-    };
-
+    
     const cleanup = () => {
       isComponentMounted = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -68,8 +67,8 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
         ws.current.onclose = null; 
         console.log(`WebSocket closing connection for chat: ${chatId}`);
         ws.current.close();
+        ws.current = null;
       }
-      ws.current = null;
     };
 
     const connect = () => {
@@ -115,7 +114,9 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
           } else if (data.type === 'delivery_status') {
-             // Delivery status logic can be added back here if needed
+             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
+              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: data.status } : m)
+            );
           }
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
@@ -145,7 +146,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     connect();
 
     return cleanup;
-  }, [chatId, queryClient]); 
+  }, [chatId, queryClient, transformWsMessage]); 
 
   return { sendMessage, sendImage, isConnected };
 }
