@@ -66,7 +66,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
-      select: (apiMessages) => apiMessages.map(transformApiMessage).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      select: (apiMessages) => apiMessages.map(msg => transformApiMessage(msg, chat.id)).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
       staleTime: 5000,
   });
 
@@ -108,7 +108,8 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
   const getStatusText = () => {
     if (isBlocked) return 'Blocked';
     if (!isConnected) return 'Connecting...';
-    return 'Online';
+    // Presence is removed, so we just show a generic status or nothing
+    return otherParticipant?.is_online ? 'Online' : 'Offline';
   }
 
   const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, is_online: false, last_seen: null };
@@ -140,7 +141,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{chatDisplayName} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{getStatusText()}</p>
+            <p className="text-xs text-muted-foreground">{isConnected ? 'Online' : 'Connecting...'}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

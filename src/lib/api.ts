@@ -162,18 +162,18 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
  * Transforms a message from the initial REST API fetch into a format the UI can use.
  * This is for OLD messages loaded via HTTP.
  */
-export function transformApiMessage(apiMsg: ApiMessage): Message {
+export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
     const currentUserId = getCurrentUserId();
     
     return {
       id: apiMsg.id.toString(),
-      chatId: apiMsg.chat.toString(), 
+      chatId: chatId, // Pass chatId to the transformer
       sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
       type: apiMsg.image ? 'image' : 'text',
       text: apiMsg.content || '',
       imageUrl: apiMsg.image || null,
       timestamp: new Date(apiMsg.created_at),
-      status: 'sent', // Default status, can be updated by delivery receipts
+      status: 'read', // Assume old messages are read
     };
 };
 

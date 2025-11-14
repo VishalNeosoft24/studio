@@ -46,15 +46,18 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
     const currentUserId = getCurrentUserId();
 
     const transformWsMessage = (wsMsg: any): Message => {
+        // The backend sends a space instead of a 'T' in the timestamp.
+        const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
+        
         return {
           id: wsMsg.id.toString(),
           chatId: wsMsg.chat_id.toString(),
           sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
-          type: wsMsg.image ? 'image' : 'text',
+          type: wsMsg.message_type === 'image' ? 'image' : 'text',
           text: wsMsg.message || '',
           imageUrl: wsMsg.image || null,
-          timestamp: new Date(wsMsg.created_at.replace(' ', 'T') + 'Z'),
-          status: 'sent',
+          timestamp: new Date(validTimestamp),
+          status: 'sent', // Initial status for new messages
         };
     };
 
@@ -112,9 +115,7 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
           } else if (data.type === 'delivery_status') {
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => m.id === String(data.message_id) ? { ...m, status: data.status } : m)
-            );
+             // Delivery status logic can be added back here if needed
           }
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);

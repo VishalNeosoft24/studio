@@ -32,6 +32,8 @@ export type Participant = {
     phone_number: string;
     profile_picture_url: string | null;
     display_name?: string | null;
+    is_online: boolean;
+    last_seen: string | null;
 }
 
 export type Chat = {
@@ -62,7 +64,6 @@ export type UpdateContactPayload = {
 // Represents the raw message from your DRF REST API (for old messages)
 export type ApiMessage = {
     id: number;
-    chat: number;
     sender: Participant;
     content: string;
     message_type: 'text' | 'image' | 'file';
@@ -112,15 +113,5 @@ export type Contact = {
     isRegistered: boolean;
 };
 
-// This type is no longer needed after simplification
-// export type PresenceState = {
-//     onlineUsers: Record<number, { last_seen: string | null }>;
-//     typingUsers: Record<string, number[]>; // { chatId: [userId1, userId2] }
-    
-//     isOnline: (userId: number) => boolean;
-//     lastSeen: (userId: number) => string | null;
-//     isTyping: (chatId: string, userId: number) => boolean;
-
-//     setPresence: (userId: number, isOnline: boolean, lastSeen: string | null) => void;
-//     setTyping: (chatId: string, userId: number, isTyping: boolean) => void;
-// };
+// Presence state is no longer needed
+// export type PresenceState = { ... }
