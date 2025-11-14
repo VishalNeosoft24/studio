@@ -1,5 +1,4 @@
 
-
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -112,6 +111,3 @@ export type Contact = {
     about: string | null;
     isRegistered: boolean;
 };
-
-// Presence state is no longer needed
-// export type PresenceState = { ... }

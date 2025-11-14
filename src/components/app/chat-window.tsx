@@ -109,7 +109,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
     if (isBlocked) return 'Blocked';
     if (!isConnected) return 'Connecting...';
     // Presence is removed, so we just show a generic status or nothing
-    return otherParticipant?.is_online ? 'Online' : 'Offline';
+    return 'Online';
   }
 
   const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, is_online: false, last_seen: null };
@@ -141,7 +141,7 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
           </Avatar>
           <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
             <h2 className="font-semibold flex items-center">{chatDisplayName} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
-            <p className="text-xs text-muted-foreground">{isConnected ? 'Online' : 'Connecting...'}</p>
+            <p className="text-xs text-muted-foreground">{getStatusText()}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
