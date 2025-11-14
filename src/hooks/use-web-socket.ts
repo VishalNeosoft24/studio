@@ -2,9 +2,6 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { QueryClient } from '@tanstack/react-query';
-import type { Message } from '@/types';
-import { getCurrentUserId } from '@/lib/api';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
 
@@ -14,131 +11,90 @@ type WebSocketHook = {
   isConnected: boolean;
 };
 
-export function useWebSocket(chatId: string | null, queryClient: QueryClient): WebSocketHook {
+export function useWebSocket(chatId: string | null, onMessage: (event: MessageEvent) => void): WebSocketHook {
   const ws = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-
-  const sendRaw = useCallback((payload: object) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(payload));
-      return true;
-    }
-    console.error('WebSocket is not open. Cannot send data.');
-    return false;
-  }, []);
 
   const sendMessage = useCallback((text: string) => {
-    console.log("⬆️ WS sent (text):", text);
-    return sendRaw({ message_type: "text", message: text });
-  }, [sendRaw]);
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket is not open. Cannot send message.');
+      return false;
+    }
+
+    const payload = JSON.stringify({
+      message_type: "text",
+      message: text,
+    });
+
+    ws.current.send(payload);
+    console.log("⬆️ WS sent (text):", payload);
+    return true;
+  }, []);
   
   const sendImage = useCallback((image: string, caption: string) => {
-    console.log("⬆️ WS sent (image)");
-    return sendRaw({ message_type: "image", image: image, message: caption });
-  }, [sendRaw]);
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket is not open. Cannot send image.');
+        return false;
+    }
+
+    const payload = JSON.stringify({
+        message_type: "image",
+        image: image, // base64 data URL
+        message: caption,
+    });
+
+    ws.current.send(payload);
+    console.log("⬆️ WS sent (image):", { message_type: "image", message: caption, image: "..." });
+    return true;
+  }, []);
 
   useEffect(() => {
-    if (!chatId) {
-      return;
-    }
+    if (!chatId) return;
     
     let isComponentMounted = true;
-    
-    const cleanup = () => {
-      isComponentMounted = false;
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      if (ws.current) {
-        ws.current.onclose = null; 
-        console.log(`WebSocket closing connection for chat: ${chatId}`);
-        ws.current.close();
-        ws.current = null;
-      }
-    };
 
     const connect = () => {
-      if (!isComponentMounted || ws.current) return;
+      if (!isComponentMounted || (ws.current && ws.current.readyState === WebSocket.OPEN)) {
+        return;
+      }
       
       const token = localStorage.getItem("access_token");
       if (!token) {
-        console.error("No auth token, retrying in 5s...");
-        if(isComponentMounted) reconnectTimeoutRef.current = setTimeout(connect, 5000);
+        console.error("No auth token found for WebSocket connection.");
+        if(isComponentMounted && !reconnectTimeoutRef.current) {
+            reconnectTimeoutRef.current = setTimeout(connect, 5000);
+        }
         return;
       }
       
       const socketUrl = `${WS_BASE_URL}/chat/${chatId}/?token=${token}`;
-      console.log(`Attempting to connect to WebSocket: ${socketUrl}`);
+      console.log("Attempting to connect to WebSocket:", socketUrl);
       
       const socket = new WebSocket(socketUrl);
       ws.current = socket;
 
       socket.onopen = () => {
-        if (!isComponentMounted) return socket.close();
-        console.log(`✅ WebSocket connection established for chat ${chatId}`);
+        if (!isComponentMounted) return;
+        console.log('✅ WebSocket connection established for chat', chatId);
         setIsConnected(true);
-        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        if (reconnectTimeoutRef.current) {
+            clearTimeout(reconnectTimeoutRef.current);
+            reconnectTimeoutRef.current = null;
+        }
       };
 
       socket.onmessage = (event) => {
         if (!isComponentMounted) return;
-        
-        try {
-          const data = JSON.parse(event.data);
-          console.log("📩 WS received:", data);
-
-          if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-            const wsMsg = data.message;
-            
-            queryClient.setQueryData<Message[]>(['messages', wsMsg.chat_id.toString()], (oldData) => {
-              const currentUserId = getCurrentUserId();
-              // Ensure oldData is an array and create a new copy
-              const existingMessages = oldData ? [...oldData] : [];
-              
-              if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
-                return existingMessages;
-              }
-
-              // The timestamp from your backend might not be a valid ISO string for all browsers
-              const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
-              
-              const newMessage: Message = {
-                id: wsMsg.id.toString(),
-                chatId: wsMsg.chat_id.toString(),
-                sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
-                type: wsMsg.message_type === 'image' ? 'image' : 'text',
-                text: wsMsg.message || '',
-                imageUrl: wsMsg.image || null,
-                timestamp: new Date(validTimestamp),
-                status: 'sent', // Or 'read' if it's from the other user
-              };
-              
-              // Return a new array with the new message
-              return [...existingMessages, newMessage];
-            });
-
-            // This tells React Query that the 'chats' list is stale and needs refetching,
-            // which is useful for updating the last message preview in the chat list.
-            queryClient.invalidateQueries({ queryKey: ['chats'] });
-
-          } else if (data.type === 'delivery_status') {
-             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: data.status } : m)
-            );
-          }
-        } catch (e) {
-          console.error('Failed to process incoming WebSocket message', e);
-        }
+        onMessage(event);
       };
 
       socket.onclose = (event) => {
         if (!isComponentMounted) return;
-        console.log(`❌ WebSocket connection closed: ${event.code}`, event.reason);
+        console.log('❌ WebSocket connection closed:', event.code, event.reason);
         setIsConnected(false);
         ws.current = null;
-        
-        if (event.code !== 1000 && isComponentMounted) {
-            if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        if(isComponentMounted && !reconnectTimeoutRef.current) {
             console.log('Attempting to reconnect in 3 seconds...');
             reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
@@ -147,14 +103,24 @@ export function useWebSocket(chatId: string | null, queryClient: QueryClient): W
       socket.onerror = (error) => {
         if (!isComponentMounted) return;
         console.error('WebSocket error:', error);
-        socket.close(); 
+        // The onclose event will be fired next, which will handle reconnection.
       };
     };
 
     connect();
 
-    return cleanup;
-  }, [chatId, queryClient]); 
+    return () => {
+      isComponentMounted = false;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (ws.current) {
+        ws.current.onclose = null; 
+        ws.current.close();
+        console.log("WebSocket connection closed on component unmount.");
+      }
+    };
+  }, [chatId, onMessage]);
 
   return { sendMessage, sendImage, isConnected };
 }

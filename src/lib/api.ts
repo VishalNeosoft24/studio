@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload, WsMessagePayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -166,7 +166,7 @@ export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message
     
     return {
       id: apiMsg.id.toString(),
-      chatId: chatId, // Pass chatId to the transformer
+      chatId: chatId,
       sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
       type: apiMsg.image ? 'image' : 'text',
       text: apiMsg.content || '',
@@ -175,6 +175,28 @@ export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message
       status: 'read', // Assume old messages are read
     };
 };
+
+/**
+ * Transforms a message from the WebSocket into a format the UI can use.
+ * This is for NEW messages arriving in real-time.
+ */
+export function transformWsMessage(wsMsg: WsMessagePayload): Message {
+    const currentUserId = getCurrentUserId();
+
+    // The timestamp from the Python backend has a space, which needs to be replaced with 'T' to be a valid ISO string.
+    const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
+
+    return {
+      id: wsMsg.id.toString(),
+      chatId: wsMsg.chat_id.toString(),
+      sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
+      type: wsMsg.message_type,
+      text: wsMsg.message || '',
+      imageUrl: wsMsg.image || null,
+      timestamp: new Date(validTimestamp),
+      status: 'sent', // Initial status for a new message
+    };
+}
 
 
 export async function login(username: string, password: string) {

@@ -1,4 +1,5 @@
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -7,9 +8,9 @@ export type User = {
     email?: string;
     phone_number?: string | null;
     profile_picture_url?: string | null;
-    about_status?: string | null;
     avatarUrl?: string | null; 
     about?: string; // a bit redundant
+    about_status?: string | null;
 }
 
 export type UpdateProfilePayload = {
@@ -68,6 +69,18 @@ export type ApiMessage = {
     message_type: 'text' | 'image' | 'file';
     created_at: string; // ISO 8601 date string
     image?: string | null; // URL for the image
+};
+
+// Represents the raw message from your WebSocket consumer
+export type WsMessagePayload = {
+    id: number;
+    message: string;
+    sender_id: number;
+    sender_username: string;
+    message_type: 'text' | 'image';
+    chat_id: number;
+    image: string | null;
+    created_at: string; // e.g., "2025-11-14 06:21:12"
 };
 
 

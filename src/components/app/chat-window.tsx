@@ -2,7 +2,7 @@
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import React from 'react';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import ContactInfoSheet from './contact-info-sheet';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getMessages, getCurrentUserId, transformApiMessage } from '@/lib/api';
+import { getMessages, getCurrentUserId, transformApiMessage, transformWsMessage } from '@/lib/api';
 import { useWebSocket } from '@/hooks/use-web-socket';
 import MessageInput from './message-input';
 
@@ -70,7 +70,42 @@ function ChatWindow({ chat, onCloseChat }: ChatWindowProps) {
       staleTime: 5000,
   });
 
-  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id, queryClient);
+  const handleWebSocketMessage = useCallback((messageEvent: MessageEvent) => {
+    try {
+      const data = JSON.parse(messageEvent.data);
+      console.log("📩 WS received:", data);
+
+      if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
+        const newMessage = transformWsMessage(data.message);
+        
+        // Check if the message belongs to the currently active chat
+        if (newMessage.chatId === chat.id) {
+            queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) => {
+                // Avoid adding duplicates
+                if (oldMessages.some(msg => msg.id === newMessage.id)) {
+                    return oldMessages;
+                }
+                return [...oldMessages, newMessage];
+            });
+        }
+        // Invalidate chats list to update the last message preview
+        queryClient.invalidateQueries({ queryKey: ['chats'] });
+
+      } else if (data.type === 'delivery_status') {
+        queryClient.setQueryData<Message[]>(['messages', chat.id], (oldMessages = []) =>
+          oldMessages.map(m =>
+            m.id === data.message_id.toString()
+              ? { ...m, status: data.status }
+              : m
+          )
+        );
+      }
+    } catch (e) {
+      console.error('Failed to parse incoming WebSocket message', e);
+    }
+  }, [chat.id, queryClient]);
+  
+  const { sendMessage, sendImage, isConnected } = useWebSocket(chat.id, handleWebSocketMessage);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
