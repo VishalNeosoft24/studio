@@ -77,7 +77,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
   
   const { data: optimisticMessages = [] } = useQuery<Message[]>({
     queryKey: [`messages-optimistic-${chat.id}`],
-    queryFn: async () => [], // Dummy function to satisfy TanStack Query
+    queryFn: async () => [], // Placeholder queryFn to satisfy React Query
     enabled: false, 
     initialData: [],
   });

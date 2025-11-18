@@ -164,6 +164,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               if (oldData.some(msg => msg.id === wsMsg.id.toString())) {
                 return oldData;
               }
+              // Robust timestamp parsing
               const validTimestamp = (wsMsg.created_at || '').includes('T') 
                 ? wsMsg.created_at 
                 : (wsMsg.created_at || '').replace(' ', 'T') + 'Z';
