@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { Message, WsMessagePayload } from '@/types';
+import type { Message, WsMessagePayload, PresenceState } from '@/types';
 import { getCurrentUserId } from '@/lib/api';
 import { usePresenceStore } from '@/stores/use-presence-store';
 
@@ -143,6 +144,13 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
+            
+            // Critical fix: ensure created_at exists before processing
+            if (!wsMsg.created_at) {
+              console.error("Received chat message with invalid timestamp:", wsMsg);
+              return;
+            }
+
             const currentUserId = getCurrentUserId();
             const tempId = wsMsg.temp_id;
             
@@ -152,10 +160,9 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               );
             }
             
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData) => {
-              const existingMessages = oldData ?? [];
-              if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
-                return existingMessages;
+            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) => {
+              if (oldData.some(msg => msg.id === wsMsg.id.toString())) {
+                return oldData;
               }
               const validTimestamp = (wsMsg.created_at || '').includes('T') 
                 ? wsMsg.created_at 
@@ -172,7 +179,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
                 status: 'sent',
               };
               
-              return [...existingMessages, newMessage];
+              return [...oldData, newMessage];
             });
             
             queryClient.invalidateQueries({ queryKey: ['chats'] });

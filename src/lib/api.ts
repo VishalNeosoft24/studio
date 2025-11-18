@@ -151,6 +151,11 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
 export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
     const currentUserId = getCurrentUserId();
   
+    // Fix for inconsistent timestamp formats
+    const validTimestamp = (apiMsg.created_at || '').includes('T') 
+        ? apiMsg.created_at 
+        : (apiMsg.created_at || '').replace(' ', 'T') + 'Z';
+
     return {
       id: apiMsg.id.toString(),
       chatId: chatId,
@@ -158,7 +163,7 @@ export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message
       type: apiMsg.message_type === 'image' ? 'image' : 'text',
       text: apiMsg.content || '',
       imageUrl: apiMsg.image || null,
-      timestamp: new Date(apiMsg.created_at),
+      timestamp: new Date(validTimestamp),
       status: apiMsg.sender.id === currentUserId ? 'read' : undefined, // This is a simplification
     };
 };

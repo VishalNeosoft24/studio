@@ -78,6 +78,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const { data: optimisticMessages = [] } = useQuery<Message[]>({
     queryKey: [`messages-optimistic-${chat.id}`],
     enabled: false, 
+    initialData: [],
   });
   
   const messages = [...apiMessages, ...optimisticMessages].sort(
