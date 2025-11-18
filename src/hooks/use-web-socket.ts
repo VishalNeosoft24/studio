@@ -80,7 +80,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
     });
 
     const payload = JSON.stringify({ 
-      message_type: "image", _
+      message_type: "image", 
       image: imageData, 
       message: imageCaption,
       temp_id: tempId
@@ -142,6 +142,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
+          // ** THE FIX - START: Route events based on their type **
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
             
@@ -153,21 +154,17 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
             const currentUserId = getCurrentUserId();
             const tempId = wsMsg.temp_id;
             
-            // ** THE FIX - Part 1: Correctly remove the optimistic message **
             if (tempId) {
               queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => 
                  old.filter(m => m.id !== tempId)
               );
             }
             
-            // ** THE FIX - Part 2: Correctly add the real message **
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) => {
-              // Prevent duplicates
               if (oldData.some(msg => msg.id === wsMsg.id.toString())) {
                 return oldData;
               }
 
-              // ** THE FIX - Part 3: Robust timestamp parsing **
               const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
               
               const newMessage: Message = {
@@ -209,6 +206,8 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           } else if (data.type === 'typing') {
             setTyping(chatId, data.user_id, data.is_typing);
           }
+          // ** THE FIX - END: Other event types are now safely ignored by the message list logic **
+
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
         }
