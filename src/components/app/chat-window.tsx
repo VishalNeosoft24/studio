@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
@@ -75,7 +74,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
       staleTime: 5000,
   });
   
-  const { sendMessage, sendImage, sendTyping, isConnected } = useWebSocket(chat.id, queryClient);
+  const { sendMessage, sendImage, sendTyping, sendReadReceipt, isConnected } = useWebSocket(chat.id, queryClient);
 
   useEffect(() => {
     if (scrollViewportRef.current) {
@@ -85,7 +84,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
             }
         }, 100);
     }
-  }, [messages, chat.id]);
+  }, [messages.length, chat.id]);
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
@@ -103,10 +102,10 @@ function ChatWindow({ chat }: ChatWindowProps) {
 
   const getStatusIcon = (status?: 'sent' | 'delivered' | 'read') => {
     switch (status) {
-      case 'read': return <CheckCheck className="h-4 w-4 text-accent" />;
+      case 'read': return <CheckCheck className="h-4 w-4 text-blue-500" />;
       case 'delivered': return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
       case 'sent': return <Check className="h-4 w-4 text-muted-foreground" />;
-      default: return null;
+      default: return <Check className="h-4 w-4 text-muted-foreground" />;
     }
   }
 
@@ -119,6 +118,53 @@ function ChatWindow({ chat }: ChatWindowProps) {
   };
 
   const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, display_name: 'Unknown', is_online: false, last_seen: null };
+
+  const MessageBubble = React.memo(({ msg }: { msg: Message }) => {
+    const msgRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting && msg.sender === 'contact' && msg.status !== 'read') {
+                    sendReadReceipt(msg.id);
+                    observer.unobserve(entry.target);
+                }
+            },
+            { threshold: 0.8 }
+        );
+
+        const currentRef = msgRef.current;
+        if (currentRef) {
+            observer.observe(currentRef);
+        }
+
+        return () => {
+            if (currentRef) {
+                observer.unobserve(currentRef);
+            }
+        };
+    }, [msg.id, msg.sender, msg.status, sendReadReceipt]);
+
+    return (
+      <div ref={msgRef} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+        <div className={`message-bubble ${msg.sender === 'me' ? 'message-bubble-outbound' : 'message-bubble-inbound'}`}>
+          {msg.type === 'image' && msg.imageUrl && (
+             <div className="relative aspect-square w-64 mb-1 cursor-pointer" onClick={() => window.open(msg.imageUrl || '', '_blank')}>
+                 <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md" />
+              </div>
+          )}
+          {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
+          <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-xs text-muted-foreground">
+              {format(msg.timestamp, 'p')}
+            </span>
+             {msg.sender === 'me' && getStatusIcon(msg.status)}
+          </div>
+        </div>
+      </div>
+    );
+  });
+  MessageBubble.displayName = 'MessageBubble';
 
   return (
     <>
@@ -226,22 +272,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
               return (
               <React.Fragment key={msg.id}>
                 {showDateSeparator && <DateSeparator date={msg.timestamp} />}
-                <div className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`message-bubble ${msg.sender === 'me' ? 'message-bubble-outbound' : 'message-bubble-inbound'}`}>
-                    {msg.type === 'image' && msg.imageUrl && (
-                       <div className="relative aspect-square w-64 mb-1 cursor-pointer" onClick={() => window.open(msg.imageUrl || '', '_blank')}>
-                           <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md" />
-                        </div>
-                    )}
-                    {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
-                    <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                      <span className="text-xs text-muted-foreground">
-                        {format(msg.timestamp, 'p')}
-                      </span>
-                       {msg.sender === 'me' && getStatusIcon(msg.status)}
-                    </div>
-                  </div>
-                </div>
+                <MessageBubble msg={msg} />
               </React.Fragment>
             )})}
             </div>

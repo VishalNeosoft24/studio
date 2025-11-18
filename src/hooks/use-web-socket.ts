@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -13,6 +12,7 @@ type WebSocketHook = {
   sendMessage: (message: string) => boolean;
   sendImage: (image: string, caption: string) => boolean;
   sendTyping: (isTyping: boolean) => void;
+  sendReadReceipt: (messageId: string) => void;
   isConnected: boolean;
 };
 
@@ -50,6 +50,12 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
     }
   }, []);
 
+  const sendReadReceipt = useCallback((messageId: string) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ message_type: 'read', message_id: messageId }));
+    }
+  }, []);
+
   useEffect(() => {
     if (!chatId) return;
 
@@ -77,12 +83,12 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
         console.log('✅ WebSocket connected for chat', chatId);
         setIsConnected(true);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-        // Start sending pings to keep connection alive and signal presence
+        
         pingIntervalRef.current = setInterval(() => {
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ message_type: 'ping' }));
             }
-        }, 10000); // every 30 seconds
+        }, 30000);
       };
 
       socket.onmessage = (event) => {
@@ -94,13 +100,21 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg = data.message;
-            queryClient.setQueryData<Message[]>(['messages', wsMsg.chat_id.toString()], (oldData = []) => {
-              if (oldData.some(msg => msg.id === wsMsg.id.toString())) return oldData;
+            const chatIdentifier = wsMsg.chat_id.toString();
+            
+            queryClient.setQueryData<Message[]>(['messages', chatIdentifier], (oldData) => {
               const currentUserId = getCurrentUserId();
+              const existingMessages = oldData ?? [];
+              
+              if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
+                return existingMessages;
+              }
+              
               const validTimestamp = wsMsg.created_at.includes('T') ? wsMsg.created_at : wsMsg.created_at.replace(' ', 'T') + 'Z';
+              
               const newMessage: Message = {
                 id: wsMsg.id.toString(),
-                chatId: wsMsg.chat_id.toString(),
+                chatId: chatIdentifier,
                 sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
                 type: wsMsg.message_type === 'image' ? 'image' : 'text',
                 text: wsMsg.message || '',
@@ -108,14 +122,21 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
                 timestamp: new Date(validTimestamp),
                 status: 'sent',
               };
-              return [...oldData, newMessage];
+
+              return [...existingMessages, newMessage];
             });
+            queryClient.invalidateQueries({ queryKey: ['chats'] });
+
           } else if (data.type === 'delivery_status') {
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: data.status } : m)
+             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
+              oldData.map(m => m.id === data.message_id.toString() && m.status !== 'read' ? { ...m, status: 'delivered' } : m)
             );
+          } else if (data.type === 'read_notification') {
+             queryClient.setQueryData<Message[]>(['messages', data.chat_id.toString()], (oldData = []) =>
+              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: 'read' } : m)
+             );
           } else if (data.type === 'presence_update') {
-            setPresence(data.user_id, data.is_online, data.last_seen);
+            setPresence(data.payload.user_id, data.payload.is_online, data.payload.last_seen);
           } else if (data.type === 'typing') {
             setTyping(chatId, data.user_id, data.is_typing);
           }
@@ -155,5 +176,5 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
     };
   }, [chatId, queryClient]);
 
-  return { sendMessage, sendImage, sendTyping, isConnected };
+  return { sendMessage, sendImage, sendTyping, sendReadReceipt, isConnected };
 }
