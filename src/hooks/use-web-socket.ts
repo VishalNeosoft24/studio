@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { Message } from '@/types';
+import type { Message, WsMessagePayload } from '@/types';
 import { getCurrentUserId } from '@/lib/api';
 import { usePresenceStore } from '@/stores/use-presence-store';
 
@@ -99,22 +100,21 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           console.log("📩 WS received:", data);
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-            const wsMsg = data.message;
-            const chatIdentifier = wsMsg.chat_id.toString();
+            const wsMsg: WsMessagePayload = data.message;
             
-            queryClient.setQueryData<Message[]>(['messages', chatIdentifier], (oldData) => {
+            queryClient.setQueryData<Message[]>(['messages', wsMsg.chat_id.toString()], (oldData) => {
               const currentUserId = getCurrentUserId();
               const existingMessages = oldData ?? [];
               
               if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
-                return existingMessages;
+                return [...existingMessages]; // Return a new array to be safe
               }
               
               const validTimestamp = wsMsg.created_at.includes('T') ? wsMsg.created_at : wsMsg.created_at.replace(' ', 'T') + 'Z';
               
               const newMessage: Message = {
                 id: wsMsg.id.toString(),
-                chatId: chatIdentifier,
+                chatId: wsMsg.chat_id.toString(),
                 sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
                 type: wsMsg.message_type === 'image' ? 'image' : 'text',
                 text: wsMsg.message || '',
@@ -139,6 +139,8 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
             setPresence(data.user_id, data.is_online, data.last_seen);
           } else if (data.type === 'typing') {
             setTyping(chatId, data.user_id, data.is_typing);
+          } else if (data.event_type === 'presence_update') {
+            setPresence(data.payload.user_id, data.payload.is_online, data.payload.last_seen);
           }
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
