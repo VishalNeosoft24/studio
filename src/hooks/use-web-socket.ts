@@ -142,7 +142,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
-          // ** THE FIX - START: Route events based on their type **
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
             
@@ -206,7 +205,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           } else if (data.type === 'typing') {
             setTyping(chatId, data.user_id, data.is_typing);
           }
-          // ** THE FIX - END: Other event types are now safely ignored by the message list logic **
 
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
