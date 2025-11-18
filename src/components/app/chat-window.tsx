@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { Message, Chat, ApiMessage, Participant } from '@/types';
@@ -24,7 +23,7 @@ import { usePresenceStore } from '@/stores/use-presence-store';
 
 
 const DateSeparator = ({ date }: { date: Date }) => {
-  let label = format(date, 'PPP'); // Fallback to full date format
+  let label = format(date, 'PPP');
   if (isToday(date)) {
     label = 'Today';
   } else if (isYesterday(date)) {
@@ -68,12 +67,21 @@ function ChatWindow({ chat }: ChatWindowProps) {
 
   const chatDisplayName = chat.chat_display_name;
   
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
+  // Fetch real messages from API
+  const { data: apiMessages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
-      select: (apiMessages) => apiMessages.map((msg) => transformApiMessage(msg, chat.id)).sort((a,b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      select: (apiMessages) => apiMessages.map((msg) => transformApiMessage(msg, chat.id)),
       staleTime: 5000,
   });
+  
+  // Get optimistic messages (pending sends)
+  const optimisticMessages = queryClient.getQueryData<Message[]>([`messages-optimistic-${chat.id}`]) || [];
+  
+  // Combine and sort all messages
+  const messages = [...apiMessages, ...optimisticMessages].sort(
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+  );
   
   const { sendMessage, sendImage, sendTyping, sendReadReceipt, isConnected } = useWebSocket(chat.id, queryClient);
 
@@ -101,11 +109,12 @@ function ChatWindow({ chat }: ChatWindowProps) {
       toast({ title: !isBlocked ? `${chatDisplayName} has been blocked` : `${chatDisplayName} has been unblocked`, variant: !isBlocked ? 'destructive' : 'default' });
   }
 
-  const getStatusIcon = (status?: 'sent' | 'delivered' | 'read') => {
+  const getStatusIcon = (status?: 'sending' | 'sent' | 'delivered' | 'read') => {
     switch (status) {
       case 'read': return <CheckCheck className="h-4 w-4 text-blue-500" />;
       case 'delivered': return <CheckCheck className="h-4 w-4 text-muted-foreground" />;
       case 'sent': return <Check className="h-4 w-4 text-muted-foreground" />;
+      case 'sending': return <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />;
       default: return <Check className="h-4 w-4 text-muted-foreground" />;
     }
   }
@@ -144,7 +153,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
                 observer.unobserve(currentRef);
             }
         };
-    }, [msg.id, msg.sender, msg.status, sendReadReceipt]);
+    }, [msg.id, msg.sender, msg.status]);
 
     return (
       <div ref={msgRef} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
@@ -263,11 +272,18 @@ function ChatWindow({ chat }: ChatWindowProps) {
                  </div>
             )}
             {messages.map((msg, index) => {
+              // Debug logging for invalid messages
               if (!msg.timestamp || isNaN(msg.timestamp.getTime())) {
-                console.error("Invalid message timestamp detected:", msg);
+                console.error("Invalid message timestamp detected:", {
+                  id: msg.id,
+                  text: msg.text,
+                  sender: msg.sender,
+                  timestamp: msg.timestamp,
+                  timestampType: typeof msg.timestamp,
+                  rawMessage: msg
+                });
                 return null;
               }
-              
               const showDateSeparator = index === 0 || !isSameDay(messages[index - 1].timestamp, msg.timestamp);
               
               return (
@@ -291,7 +307,12 @@ function ChatWindow({ chat }: ChatWindowProps) {
           </Alert>
         </CardFooter>
       ) : (
-        <MessageInput onSendMessage={sendMessage} onSendImage={sendImage} onTyping={sendTyping} isConnected={isConnected} />
+        <MessageInput 
+          onSendMessage={sendMessage}
+          onSendImage={sendImage}
+          onTyping={sendTyping} 
+          isConnected={isConnected} 
+        />
       )}
     </Card>
     </>

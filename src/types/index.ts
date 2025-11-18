@@ -75,12 +75,13 @@ export type ApiMessage = {
 export type WsMessagePayload = {
     id: number;
     message: string;
-    sender_id: number;
+    sender_id: number | string;
     sender_username: string;
     message_type: 'text' | 'image';
     chat_id: number;
     image: string | null;
     created_at: string; // e.g., "2025-11-14 06:21:12"
+    temp_id?: string;
 };
 
 
@@ -93,7 +94,7 @@ export type Message = {
   text: string;
   imageUrl?: string | null;
   timestamp: Date; // Date object for easier formatting
-  status?: 'sent' | 'delivered' | 'read'; // Optional status for outbound messages
+  status?: 'sent' | 'delivered' | 'read' | 'sending'; // Optional status for outbound messages
 };
 
 

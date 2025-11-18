@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -23,37 +22,90 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const sendMessage = useCallback((text: string) => {
+  const sendMessage = useCallback((messageText: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
       console.error('WebSocket is not open. Cannot send message.');
       return false;
     }
-    const payload = JSON.stringify({ message_type: "text", message: text });
+
+    // Generate unique temp ID
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const currentTime = new Date();
+
+    // Optimistic update: Add message immediately to SEPARATE cache key
+    queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
+      const optimisticMessage: Message = {
+        id: tempId,
+        chatId: chatId,
+        sender: 'me',
+        type: 'text',
+        text: messageText,
+        imageUrl: null,
+        timestamp: currentTime,
+        status: 'sending',
+      };
+      console.log('➕ Adding optimistic message:', optimisticMessage);
+      return [...old, optimisticMessage];
+    });
+
+    // Send message with temp_id so server can echo it back
+    const payload = JSON.stringify({ 
+      message_type: "text", 
+      message: messageText, 
+      temp_id: tempId 
+    });
     ws.current.send(payload);
     console.log("⬆️ WS sent (text):", payload);
     return true;
-  }, []);
+  }, [chatId, queryClient]);
 
-  const sendImage = useCallback((image: string, caption: string) => {
+  const sendImage = useCallback((imageData: string, imageCaption: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-        console.error('WebSocket is not open. Cannot send image.');
-        return false;
+      console.error('WebSocket is not open. Cannot send image.');
+      return false;
     }
-    const payload = JSON.stringify({ message_type: "image", image: image, message: caption });
+
+    // Generate unique temp ID
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const currentTime = new Date();
+
+    // Optimistic update: Add image message immediately to SEPARATE cache key
+    queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
+      const optimisticMessage: Message = {
+        id: tempId,
+        chatId: chatId,
+        sender: 'me',
+        type: 'image',
+        text: imageCaption,
+        imageUrl: imageData,
+        timestamp: currentTime,
+        status: 'sending',
+      };
+      console.log('➕ Adding optimistic image:', optimisticMessage);
+      return [...old, optimisticMessage];
+    });
+
+    // Send image with temp_id
+    const payload = JSON.stringify({ 
+      message_type: "image", 
+      image: imageData, 
+      message: imageCaption,
+      temp_id: tempId
+    });
     ws.current.send(payload);
-    console.log("⬆️ WS sent (image):", { message_type: "image", message: caption, image: "..." });
+    console.log("⬆️ WS sent (image):", { message_type: "image", message: imageCaption, temp_id: tempId, image: "..." });
     return true;
-  }, []);
+  }, [chatId, queryClient]);
 
   const sendTyping = useCallback((isTyping: boolean) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ message_type: 'typing', is_typing: isTyping }));
+      ws.current.send(JSON.stringify({ message_type: 'typing', is_typing: isTyping }));
     }
   }, []);
 
   const sendReadReceipt = useCallback((messageId: string) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ message_type: 'read', message_id: messageId }));
+      ws.current.send(JSON.stringify({ message_type: 'read', message_id: messageId }));
     }
   }, []);
 
@@ -86,9 +138,9 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         
         pingIntervalRef.current = setInterval(() => {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ message_type: 'ping' }));
-            }
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ message_type: 'ping' }));
+          }
         }, 30000);
       };
 
@@ -101,40 +153,86 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
+            const currentUserId = getCurrentUserId();
+            const tempId = wsMsg.temp_id || data.temp_id;
             
-            queryClient.setQueryData<Message[]>(['messages', wsMsg.chat_id.toString()], (oldData) => {
-              const currentUserId = getCurrentUserId();
+            console.log('Processing WebSocket message:', {
+              wsMsg_sender_id: wsMsg.sender_id,
+              wsMsg_sender_id_type: typeof wsMsg.sender_id,
+              currentUserId,
+              currentUserId_type: typeof currentUserId,
+              isMe: wsMsg.sender_id === currentUserId,
+              isMe_loose: wsMsg.sender_id == currentUserId
+            });
+            
+            // Remove the optimistic message if temp_id matches
+            if (tempId) {
+              queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
+                const filtered = old.filter(m => m.id !== tempId);
+                console.log(`🗑️ Removed optimistic message ${tempId}`);
+                return filtered;
+              });
+            }
+            
+            // Add or update real message in main cache
+            // Use the chatId from the hook, not from wsMsg to ensure consistency
+            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData) => {
               const existingMessages = oldData ?? [];
               
+              // Check if this real message already exists
               if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
-                return [...existingMessages]; // Return a new array to be safe
+                console.log(`⚠️ Message ${wsMsg.id} already exists, skipping`);
+                return existingMessages;
               }
               
-              const validTimestamp = wsMsg.created_at.includes('T') ? wsMsg.created_at : wsMsg.created_at.replace(' ', 'T') + 'Z';
+              const validTimestamp = wsMsg.created_at.includes('T') 
+                ? wsMsg.created_at 
+                : wsMsg.created_at.replace(' ', 'T') + 'Z';
+              
+              console.log('Creating message from WebSocket:', {
+                id: wsMsg.id,
+                text: wsMsg.message,
+                sender_id: wsMsg.sender_id,
+                currentUserId,
+                created_at: wsMsg.created_at,
+                validTimestamp
+              });
               
               const newMessage: Message = {
                 id: wsMsg.id.toString(),
-                chatId: wsMsg.chat_id.toString(),
-                sender: wsMsg.sender_id === currentUserId ? 'me' : 'contact',
+                chatId: chatId, // Use chatId from hook for consistency
+                sender: String(wsMsg.sender_id) === String(currentUserId) ? 'me' : 'contact',
                 type: wsMsg.message_type === 'image' ? 'image' : 'text',
                 text: wsMsg.message || '',
                 imageUrl: wsMsg.image || null,
                 timestamp: new Date(validTimestamp),
                 status: 'sent',
               };
+              
+              console.log('Created message object:', newMessage);
 
+              console.log(`➕ Adding new message ${wsMsg.id}`);
               return [...existingMessages, newMessage];
             });
+            
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
           } else if (data.type === 'delivery_status') {
-             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => m.id === data.message_id.toString() && m.status !== 'read' ? { ...m, status: 'delivered' } : m)
+            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
+              oldData.map(m => 
+                m.id === data.message_id.toString() && m.status !== 'read' 
+                  ? { ...m, status: 'delivered' } 
+                  : m
+              )
             );
           } else if (data.type === 'read_notification') {
-             queryClient.setQueryData<Message[]>(['messages', data.chat_id.toString()], (oldData = []) =>
-              oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: 'read' } : m)
-             );
+            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
+              oldData.map(m => 
+                m.id === data.message_id.toString() 
+                  ? { ...m, status: 'read' } 
+                  : m
+              )
+            );
           } else if (data.type === 'presence_update') {
             setPresence(data.user_id, data.is_online, data.last_seen);
           } else if (data.type === 'typing') {
@@ -152,7 +250,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
         console.log('❌ WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         ws.current = null;
-        if(pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         if (isComponentMounted && !reconnectTimeoutRef.current) {
           reconnectTimeoutRef.current = setTimeout(connect, 3000);
         }
