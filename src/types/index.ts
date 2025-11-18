@@ -65,7 +65,8 @@ export type UpdateContactPayload = {
 export type ApiMessage = {
     id: number;
     sender: Participant;
-    content: string;
+    content: string; // Key for REST API
+    message?: never; // Ensure only one can exist
     message_type: 'text' | 'image' | 'file';
     created_at: string; // ISO 8601 date string
     image?: string | null; // URL for the image
@@ -74,8 +75,9 @@ export type ApiMessage = {
 // Represents the raw message from your WebSocket consumer
 export type WsMessagePayload = {
     id: number;
-    message: string;
-    sender_id: number | string;
+    message: string; // Key for WebSocket
+    content?: never; // Ensure only one can exist
+    sender_id: number;
     sender_username: string;
     message_type: 'text' | 'image';
     chat_id: number;

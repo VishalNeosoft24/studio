@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import type { Message, WsMessagePayload, PresenceState } from '@/types';
-import { getCurrentUserId } from '@/lib/api';
+import { getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { usePresenceStore } from '@/stores/use-presence-store';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
@@ -142,6 +142,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
+          // --- Strict Event Routing ---
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
             
@@ -149,42 +150,31 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               console.error("Received chat message with invalid timestamp:", wsMsg);
               return;
             }
-
-            const currentUserId = getCurrentUserId();
-            const tempId = wsMsg.temp_id;
             
-            if (tempId) {
+            const newMessage = transformApiMessage(wsMsg, chatId);
+            
+            // 1. Remove from optimistic cache if temp_id exists
+            if (wsMsg.temp_id) {
               queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => 
-                 old.filter(m => m.id !== tempId)
+                 old.filter(m => m.id !== wsMsg.temp_id)
               );
             }
             
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) => {
-              if (oldData.some(msg => msg.id === wsMsg.id.toString())) {
+            // 2. Add the real message to the main cache
+            queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) => {
+              // Ensure we don't add duplicates
+              if (oldData.some(msg => msg.id === newMessage.id)) {
                 return oldData;
               }
-
-              const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
-              
-              const newMessage: Message = {
-                id: wsMsg.id.toString(),
-                chatId: chatId,
-                sender: String(wsMsg.sender_id) === String(currentUserId) ? 'me' : 'contact',
-                type: wsMsg.message_type === 'image' ? 'image' : 'text',
-                text: wsMsg.message || '',
-                imageUrl: wsMsg.image || null,
-                timestamp: new Date(validTimestamp),
-                status: 'sent',
-              };
-              
-              return [...oldData, newMessage];
+              // Add the raw wsMsg payload to keep the cache consistent with the REST API shape
+              return [...oldData, wsMsg as unknown as ApiMessage];
             });
             
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
           } else if (data.type === 'delivery_status') {
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => 
+              oldData?.map(m => 
                 m.id === data.message_id.toString() && m.status !== 'read' 
                   ? { ...m, status: 'delivered' } 
                   : m
@@ -193,8 +183,8 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           } else if (data.type === 'read_notification' || data.type === 'message_read') {
               const messageIdToUpdate = data.message_id.toString();
               queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-                  oldData.map(m =>
-                      m.sender === 'me' && m.status !== 'read' && m.id <= messageIdToUpdate
+                  oldData?.map(m =>
+                      m.sender === 'me' && m.status !== 'read' && parseInt(m.id, 10) <= parseInt(messageIdToUpdate, 10)
                           ? { ...m, status: 'read' }
                           : m
                   )

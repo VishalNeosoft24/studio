@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload, WsMessagePayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -148,24 +148,37 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
+// This function now handles both REST API and WebSocket message shapes
+export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatId: string): Message {
+    console.log("TRANSFORM: Input to transformApiMessage", apiMsg);
     const currentUserId = getCurrentUserId();
-  
-    // Fix for inconsistent timestamp formats
-    const validTimestamp = (apiMsg.created_at || '').includes('T') 
-        ? apiMsg.created_at 
-        : (apiMsg.created_at || '').replace(' ', 'T') + 'Z';
 
-    return {
+    // Determine sender based on which shape the object is
+    const senderId = 'sender' in apiMsg ? apiMsg.sender.id : apiMsg.sender_id;
+  
+    // Robustly parse the timestamp
+    const rawTimestamp = apiMsg.created_at;
+    const validTimestampStr = (rawTimestamp || '').replace(' ', 'T') + 'Z';
+    const timestamp = new Date(validTimestampStr);
+    console.log(`TRANSFORM: Raw: "${rawTimestamp}", Processed: "${validTimestampStr}", Final Date:`, timestamp);
+
+
+    // Determine message content field based on object shape
+    const textContent = 'content' in apiMsg ? apiMsg.content : apiMsg.message;
+    
+    const transformedMessage: Message = {
       id: apiMsg.id.toString(),
       chatId: chatId,
-      sender: apiMsg.sender.id === currentUserId ? 'me' : 'contact',
+      sender: senderId === currentUserId ? 'me' : 'contact',
       type: apiMsg.message_type === 'image' ? 'image' : 'text',
-      text: apiMsg.content || '',
+      text: textContent || '',
       imageUrl: apiMsg.image || null,
-      timestamp: new Date(validTimestamp),
-      status: apiMsg.sender.id === currentUserId ? 'read' : undefined, // This is a simplification
+      timestamp: timestamp,
+      status: senderId === currentUserId ? 'read' : undefined, // Simplification
     };
+
+    console.log("TRANSFORM: Output of transformApiMessage", transformedMessage);
+    return transformedMessage;
 };
 
 export async function login(username: string, password: string) {
