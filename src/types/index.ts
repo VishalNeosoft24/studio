@@ -1,4 +1,5 @@
 
+
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -65,19 +66,22 @@ export type UpdateContactPayload = {
 export type ApiMessage = {
     id: number;
     sender: Participant;
-    content: string; // Key for REST API
-    message?: never; // Ensure only one can exist
+    sender_id?: never; // For type narrowing
+    content: string;
+    message?: never; 
     message_type: 'text' | 'image' | 'file';
-    created_at: string; // ISO 8601 date string
-    image?: string | null; // URL for the image
+    created_at: string;
+    image?: string | null;
+    status?: 'sent' | 'delivered' | 'read';
 };
 
 // Represents the raw message from your WebSocket consumer
 export type WsMessagePayload = {
     id: number;
-    message: string; // Key for WebSocket
-    content?: never; // Ensure only one can exist
+    message: string;
+    content?: never;
     sender_id: number;
+    sender?: never; // For type narrowing
     sender_username: string;
     message_type: 'text' | 'image';
     chat_id: number;

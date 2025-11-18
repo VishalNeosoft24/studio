@@ -158,11 +158,13 @@ export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatI
   
     // Robustly parse the timestamp
     const rawTimestamp = apiMsg.created_at;
-    // The backend sends timestamps like "2024-07-26 10:30:00", which needs a 'T' to be a valid ISO string.
     const validTimestampStr = (rawTimestamp || '').replace(' ', 'T') + 'Z';
     const timestamp = new Date(validTimestampStr);
 
-    // Determine message content field based on object shape
+    if (isNaN(timestamp.getTime())) {
+        console.error("TRANSFORM: Created Invalid Date from", rawTimestamp);
+    }
+    
     const textContent = 'content' in apiMsg ? apiMsg.content : apiMsg.message;
     
     const transformedMessage: Message = {
@@ -173,7 +175,7 @@ export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatI
       text: textContent || '',
       imageUrl: apiMsg.image || null,
       timestamp: timestamp,
-      status: senderId === currentUserId ? 'read' : undefined, // Simplification
+      status: senderId === currentUserId ? ('status' in apiMsg ? apiMsg.status : 'read') : undefined, // Simplification
     };
 
     console.log("TRANSFORM: Output of transformApiMessage", transformedMessage);

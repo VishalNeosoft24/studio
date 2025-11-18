@@ -160,32 +160,34 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
             
             // 2. Add the real message to the main cache
             queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) => {
-              // Ensure we don't add duplicates
-              if (oldData.some(msg => msg.id === wsMsg.id)) {
-                return oldData;
-              }
-              // Add the raw wsMsg payload to keep the cache consistent with the REST API shape
-              return [...oldData, wsMsg as unknown as ApiMessage];
+                // Ensure we don't add duplicates
+                if (oldData.some(msg => msg.id === wsMsg.id)) {
+                  return oldData;
+                }
+                // Add the raw wsMsg payload to keep the cache consistent with the REST API shape
+                return [...oldData, wsMsg as unknown as ApiMessage];
             });
             
             queryClient.invalidateQueries({ queryKey: ['chats'] });
 
           } else if (data.type === 'delivery_status') {
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData?.map(m => 
-                m.id === data.message_id.toString() && m.status !== 'read' 
-                  ? { ...m, status: 'delivered' } 
-                  : m
-              )
+             queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) =>
+                oldData.map(m => 
+                  m.id.toString() === data.message_id.toString() && m.status !== 'read'
+                    ? { ...m, status: 'delivered' }
+                    : m
+                )
             );
           } else if (data.type === 'read_notification' || data.type === 'message_read') {
               const messageIdToUpdate = data.message_id.toString();
-              queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-                  oldData?.map(m =>
-                      m.sender === 'me' && m.status !== 'read' && parseInt(m.id, 10) <= parseInt(messageIdToUpdate, 10)
-                          ? { ...m, status: 'read' }
-                          : m
-                  )
+              queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) =>
+                  oldData.map(m => {
+                      const senderId = 'sender' in m ? m.sender.id : m.sender_id;
+                      if (senderId === getCurrentUserId() && m.status !== 'read' && parseInt(m.id.toString(), 10) <= parseInt(messageIdToUpdate, 10)) {
+                         return { ...m, status: 'read' };
+                      }
+                      return m;
+                  })
               );
           } else if (data.type === 'presence_update' || (data.event_type === 'presence_update' && data.payload)) {
             const payload = data.type === 'presence_update' ? data : data.payload;
