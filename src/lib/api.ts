@@ -158,6 +158,7 @@ export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatI
   
     // Robustly parse the timestamp
     const rawTimestamp = apiMsg.created_at;
+    // The backend sends timestamps like "2024-07-26 10:30:00", which needs a 'T' to be a valid ISO string.
     const validTimestampStr = (rawTimestamp || '').replace(' ', 'T') + 'Z';
     const timestamp = new Date(validTimestampStr);
 
