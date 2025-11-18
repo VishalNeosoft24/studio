@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
-import type { Message, WsMessagePayload, PresenceState } from '@/types';
+import type { Message, WsMessagePayload, PresenceState, ApiMessage } from '@/types';
 import { getCurrentUserId, transformApiMessage } from '@/lib/api';
 import { usePresenceStore } from '@/stores/use-presence-store';
 
@@ -151,8 +151,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               return;
             }
             
-            const newMessage = transformApiMessage(wsMsg, chatId);
-            
             // 1. Remove from optimistic cache if temp_id exists
             if (wsMsg.temp_id) {
               queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => 
@@ -163,7 +161,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
             // 2. Add the real message to the main cache
             queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) => {
               // Ensure we don't add duplicates
-              if (oldData.some(msg => msg.id === newMessage.id)) {
+              if (oldData.some(msg => msg.id === wsMsg.id)) {
                 return oldData;
               }
               // Add the raw wsMsg payload to keep the cache consistent with the REST API shape

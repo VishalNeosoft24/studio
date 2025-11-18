@@ -160,8 +160,6 @@ export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatI
     const rawTimestamp = apiMsg.created_at;
     const validTimestampStr = (rawTimestamp || '').replace(' ', 'T') + 'Z';
     const timestamp = new Date(validTimestampStr);
-    console.log(`TRANSFORM: Raw: "${rawTimestamp}", Processed: "${validTimestampStr}", Final Date:`, timestamp);
-
 
     // Determine message content field based on object shape
     const textContent = 'content' in apiMsg ? apiMsg.content : apiMsg.message;
