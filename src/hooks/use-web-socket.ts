@@ -152,28 +152,26 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               );
             }
             
-            const validTimestamp = (wsMsg.created_at || '').replace(' ', 'T') + 'Z';
-            const newMessage: Message = {
+            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData) => {
+              const existingMessages = oldData ?? [];
+              if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
+                return existingMessages;
+              }
+              const validTimestamp = (wsMsg.created_at || '').includes('T') 
+                ? wsMsg.created_at 
+                : (wsMsg.created_at || '').replace(' ', 'T') + 'Z';
+              
+              const newMessage: Message = {
                 id: wsMsg.id.toString(),
-                chatId: wsMsg.chat_id.toString(),
+                chatId: chatId,
                 sender: String(wsMsg.sender_id) === String(currentUserId) ? 'me' : 'contact',
                 type: wsMsg.message_type === 'image' ? 'image' : 'text',
                 text: wsMsg.message || '',
                 imageUrl: wsMsg.image || null,
                 timestamp: new Date(validTimestamp),
                 status: 'sent',
-            };
-
-            if (new Date(newMessage.timestamp).toString() === 'Invalid Date') {
-              console.error("Created an invalid message object from WS data:", newMessage, wsMsg);
-              return;
-            }
-
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData) => {
-              const existingMessages = oldData ?? [];
-              if (existingMessages.some(msg => msg.id === newMessage.id)) {
-                return existingMessages;
-              }
+              };
+              
               return [...existingMessages, newMessage];
             });
             
