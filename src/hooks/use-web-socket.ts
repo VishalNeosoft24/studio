@@ -28,11 +28,9 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
       return false;
     }
 
-    // Generate unique temp ID
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const currentTime = new Date();
 
-    // Optimistic update: Add message immediately to SEPARATE cache key
     queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
       const optimisticMessage: Message = {
         id: tempId,
@@ -44,11 +42,9 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
         timestamp: currentTime,
         status: 'sending',
       };
-      console.log('➕ Adding optimistic message:', optimisticMessage);
       return [...old, optimisticMessage];
     });
 
-    // Send message with temp_id so server can echo it back
     const payload = JSON.stringify({ 
       message_type: "text", 
       message: messageText, 
@@ -65,11 +61,9 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
       return false;
     }
 
-    // Generate unique temp ID
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const currentTime = new Date();
 
-    // Optimistic update: Add image message immediately to SEPARATE cache key
     queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
       const optimisticMessage: Message = {
         id: tempId,
@@ -81,11 +75,9 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
         timestamp: currentTime,
         status: 'sending',
       };
-      console.log('➕ Adding optimistic image:', optimisticMessage);
       return [...old, optimisticMessage];
     });
 
-    // Send image with temp_id
     const payload = JSON.stringify({ 
       message_type: "image", 
       image: imageData, 
@@ -120,7 +112,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
 
       const token = localStorage.getItem("access_token");
       if (!token) {
-        console.error("No auth token for WebSocket. Retrying...");
         if (isComponentMounted && !reconnectTimeoutRef.current) {
           reconnectTimeoutRef.current = setTimeout(connect, 5000);
         }
@@ -133,7 +124,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
 
       socket.onopen = () => {
         if (!isComponentMounted) return;
-        console.log('✅ WebSocket connected for chat', chatId);
         setIsConnected(true);
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         
@@ -154,53 +144,26 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
             const currentUserId = getCurrentUserId();
-            const tempId = wsMsg.temp_id || data.temp_id;
+            const tempId = wsMsg.temp_id;
             
-            console.log('Processing WebSocket message:', {
-              wsMsg_sender_id: wsMsg.sender_id,
-              wsMsg_sender_id_type: typeof wsMsg.sender_id,
-              currentUserId,
-              currentUserId_type: typeof currentUserId,
-              isMe: wsMsg.sender_id === currentUserId,
-              isMe_loose: wsMsg.sender_id == currentUserId
-            });
-            
-            // Remove the optimistic message if temp_id matches
             if (tempId) {
-              queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
-                const filtered = old.filter(m => m.id !== tempId);
-                console.log(`🗑️ Removed optimistic message ${tempId}`);
-                return filtered;
-              });
+              queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => 
+                 old.filter(m => m.id !== tempId)
+              );
             }
             
-            // Add or update real message in main cache
-            // Use the chatId from the hook, not from wsMsg to ensure consistency
             queryClient.setQueryData<Message[]>(['messages', chatId], (oldData) => {
               const existingMessages = oldData ?? [];
-              
-              // Check if this real message already exists
               if (existingMessages.some(msg => msg.id === wsMsg.id.toString())) {
-                console.log(`⚠️ Message ${wsMsg.id} already exists, skipping`);
                 return existingMessages;
               }
-              
-              const validTimestamp = wsMsg.created_at.includes('T') 
+              const validTimestamp = (wsMsg.created_at || '').includes('T') 
                 ? wsMsg.created_at 
-                : wsMsg.created_at.replace(' ', 'T') + 'Z';
-              
-              console.log('Creating message from WebSocket:', {
-                id: wsMsg.id,
-                text: wsMsg.message,
-                sender_id: wsMsg.sender_id,
-                currentUserId,
-                created_at: wsMsg.created_at,
-                validTimestamp
-              });
+                : (wsMsg.created_at || '').replace(' ', 'T') + 'Z';
               
               const newMessage: Message = {
                 id: wsMsg.id.toString(),
-                chatId: chatId, // Use chatId from hook for consistency
+                chatId: chatId,
                 sender: String(wsMsg.sender_id) === String(currentUserId) ? 'me' : 'contact',
                 type: wsMsg.message_type === 'image' ? 'image' : 'text',
                 text: wsMsg.message || '',
@@ -209,9 +172,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
                 status: 'sent',
               };
               
-              console.log('Created message object:', newMessage);
-
-              console.log(`➕ Adding new message ${wsMsg.id}`);
               return [...existingMessages, newMessage];
             });
             
@@ -233,12 +193,11 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
                   : m
               )
             );
-          } else if (data.type === 'presence_update') {
-            setPresence(data.user_id, data.is_online, data.last_seen);
+          } else if (data.type === 'presence_update' || (data.event_type === 'presence_update' && data.payload)) {
+            const payload = data.type === 'presence_update' ? data : data.payload;
+            setPresence(payload.user_id, payload.is_online, payload.last_seen);
           } else if (data.type === 'typing') {
             setTyping(chatId, data.user_id, data.is_typing);
-          } else if (data.event_type === 'presence_update') {
-            setPresence(data.payload.user_id, data.payload.is_online, data.payload.last_seen);
           }
         } catch (e) {
           console.error('Failed to process incoming WebSocket message', e);
@@ -247,7 +206,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
 
       socket.onclose = (event) => {
         if (!isComponentMounted) return;
-        console.log('❌ WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         ws.current = null;
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
@@ -271,7 +229,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
       if (ws.current) {
         ws.current.onclose = null;
         ws.current.close();
-        console.log("WebSocket connection closed on component unmount.");
       }
     };
   }, [chatId, queryClient]);

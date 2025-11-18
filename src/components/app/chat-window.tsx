@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
-import { SendHorizonal, Check, CheckCheck, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { SendHorizonal, Check, CheckCheck, MoreVertical, Phone, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -67,18 +67,18 @@ function ChatWindow({ chat }: ChatWindowProps) {
 
   const chatDisplayName = chat.chat_display_name;
   
-  // Fetch real messages from API
   const { data: apiMessages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
       queryKey: ['messages', chat.id],
       queryFn: () => getMessages(chat.id),
-      select: (apiMessages) => apiMessages.map((msg) => transformApiMessage(msg, chat.id)),
+      select: (data) => data.map((msg) => transformApiMessage(msg, chat.id)),
       staleTime: 5000,
   });
   
-  // Get optimistic messages (pending sends)
-  const optimisticMessages = queryClient.getQueryData<Message[]>([`messages-optimistic-${chat.id}`]) || [];
+  const { data: optimisticMessages = [] } = useQuery<Message[]>({
+    queryKey: [`messages-optimistic-${chat.id}`],
+    enabled: false, 
+  });
   
-  // Combine and sort all messages
   const messages = [...apiMessages, ...optimisticMessages].sort(
     (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
   );
@@ -133,9 +133,13 @@ function ChatWindow({ chat }: ChatWindowProps) {
     const msgRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (!msgRef.current || msg.sender === 'me' || msg.status === 'read' || msg.id.toString().startsWith('temp-')) {
+          return;
+        }
+
         const observer = new IntersectionObserver(
             ([entry]) => {
-                if (entry.isIntersecting && msg.sender === 'contact' && msg.status !== 'read') {
+                if (entry.isIntersecting) {
                     sendReadReceipt(msg.id);
                     observer.unobserve(entry.target);
                 }
@@ -143,17 +147,12 @@ function ChatWindow({ chat }: ChatWindowProps) {
             { threshold: 0.8 }
         );
 
-        const currentRef = msgRef.current;
-        if (currentRef) {
-            observer.observe(currentRef);
-        }
+        observer.observe(msgRef.current);
 
         return () => {
-            if (currentRef) {
-                observer.unobserve(currentRef);
-            }
+            observer.disconnect();
         };
-    }, [msg.id, msg.sender, msg.status]);
+    }, [msg.id, msg.sender, msg.status, sendReadReceipt]);
 
     return (
       <div ref={msgRef} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
@@ -272,16 +271,8 @@ function ChatWindow({ chat }: ChatWindowProps) {
                  </div>
             )}
             {messages.map((msg, index) => {
-              // Debug logging for invalid messages
               if (!msg.timestamp || isNaN(msg.timestamp.getTime())) {
-                console.error("Invalid message timestamp detected:", {
-                  id: msg.id,
-                  text: msg.text,
-                  sender: msg.sender,
-                  timestamp: msg.timestamp,
-                  timestampType: typeof msg.timestamp,
-                  rawMessage: msg
-                });
+                console.error("Invalid message timestamp detected:", msg);
                 return null;
               }
               const showDateSeparator = index === 0 || !isSameDay(messages[index - 1].timestamp, msg.timestamp);
