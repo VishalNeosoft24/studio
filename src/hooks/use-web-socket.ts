@@ -136,7 +136,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               oldData.map(m => m.id === data.message_id.toString() ? { ...m, status: 'read' } : m)
              );
           } else if (data.type === 'presence_update') {
-            setPresence(data.payload.user_id, data.payload.is_online, data.payload.last_seen);
+            setPresence(data.user_id, data.is_online, data.last_seen);
           } else if (data.type === 'typing') {
             setTyping(chatId, data.user_id, data.is_typing);
           }
