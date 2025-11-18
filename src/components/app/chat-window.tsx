@@ -68,23 +68,12 @@ function ChatWindow({ chat }: ChatWindowProps) {
 
   const chatDisplayName = chat.chat_display_name;
   
-  const { data: apiMessages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
-      queryKey: ['messages', chat.id],
-      queryFn: () => getMessages(chat.id),
-      select: (data) => data.map((msg) => transformApiMessage(msg, chat.id)),
-      staleTime: 5000,
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
+    queryKey: ['messages', chat.id],
+    queryFn: () => getMessages(chat.id),
+    select: (data) => data.map((msg) => transformApiMessage(msg, chat.id)).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
+    staleTime: 5000,
   });
-  
-  const { data: optimisticMessages = [] } = useQuery<Message[]>({
-    queryKey: [`messages-optimistic-${chat.id}`],
-    queryFn: async () => [], // Placeholder queryFn to satisfy React Query
-    enabled: false, 
-    initialData: [],
-  });
-  
-  const messages = [...apiMessages, ...optimisticMessages].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-  );
   
   const { sendMessage, sendImage, sendTyping, sendReadReceipt, isConnected } = useWebSocket(chat.id, queryClient);
 

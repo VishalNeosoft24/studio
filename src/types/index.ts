@@ -63,25 +63,25 @@ export type UpdateContactPayload = {
 
 
 // Represents the raw message from your DRF REST API (for old messages)
+// This is now a more flexible type to handle both REST and WS data before transformation.
 export type ApiMessage = {
-    id: number;
-    sender: Participant;
-    sender_id?: never; // For type narrowing
-    content: string;
-    message?: never; 
+    id: number | string; // Can be string for temp_id
+    sender?: Participant; // Present in REST API
+    sender_id?: number; // Present in WS and for optimistic messages
+    content?: string; // Present in REST API
+    message?: string; // Present in WS
     message_type: 'text' | 'image' | 'file';
     created_at: string;
     image?: string | null;
-    status?: 'sent' | 'delivered' | 'read';
+    status?: 'sending' | 'sent' | 'delivered' | 'read';
+    temp_id?: string; // For optimistic updates
 };
 
 // Represents the raw message from your WebSocket consumer
 export type WsMessagePayload = {
     id: number;
     message: string;
-    content?: never;
     sender_id: number;
-    sender?: never; // For type narrowing
     sender_username: string;
     message_type: 'text' | 'image';
     chat_id: number;

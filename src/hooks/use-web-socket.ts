@@ -32,18 +32,19 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const currentTime = new Date();
 
-    queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
-      const optimisticMessage: Message = {
-        id: tempId,
-        chatId: chatId,
-        sender: 'me',
-        type: 'text',
-        text: messageText,
-        imageUrl: null,
-        timestamp: currentTime,
-        status: 'sending',
-      };
-      return [...old, optimisticMessage];
+    const optimisticMessage: ApiMessage = {
+      id: tempId,
+      temp_id: tempId,
+      sender_id: getCurrentUserId()!,
+      content: messageText,
+      message_type: 'text',
+      created_at: currentTime.toISOString(),
+      image: null,
+      status: 'sending',
+    };
+
+    queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (old = []) => {
+        return [...old, optimisticMessage];
     });
 
     const payload = JSON.stringify({ 
@@ -65,17 +66,18 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const currentTime = new Date();
 
-    queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => {
-      const optimisticMessage: Message = {
-        id: tempId,
-        chatId: chatId,
-        sender: 'me',
-        type: 'image',
-        text: imageCaption,
-        imageUrl: imageData,
-        timestamp: currentTime,
-        status: 'sending',
-      };
+    const optimisticMessage: ApiMessage = {
+      id: tempId,
+      temp_id: tempId,
+      sender_id: getCurrentUserId()!,
+      content: imageCaption,
+      message_type: 'image',
+      created_at: currentTime.toISOString(),
+      image: imageData,
+      status: 'sending',
+    };
+
+    queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (old = []) => {
       return [...old, optimisticMessage];
     });
 
@@ -142,7 +144,6 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           const data = JSON.parse(event.data);
           console.log("📩 WS received:", data);
 
-          // --- Strict Event Routing ---
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
             
@@ -151,21 +152,27 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               return;
             }
             
-            // 1. Remove from optimistic cache if temp_id exists
-            if (wsMsg.temp_id) {
-              queryClient.setQueryData<Message[]>([`messages-optimistic-${chatId}`], (old = []) => 
-                 old.filter(m => m.id !== wsMsg.temp_id)
-              );
-            }
-            
-            // 2. Add the real message to the main cache
             queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) => {
+                const filteredData = wsMsg.temp_id ? oldData.filter(m => m.id !== wsMsg.temp_id) : oldData;
+                
                 // Ensure we don't add duplicates
-                if (oldData.some(msg => msg.id === wsMsg.id)) {
-                  return oldData;
+                if (filteredData.some(msg => msg.id === wsMsg.id)) {
+                  return filteredData;
                 }
-                // Add the raw wsMsg payload to keep the cache consistent with the REST API shape
-                return [...oldData, wsMsg as unknown as ApiMessage];
+                
+                // Add the new message, ensuring it conforms to ApiMessage shape for consistency
+                const newMessage: ApiMessage = {
+                  id: wsMsg.id,
+                  content: wsMsg.message,
+                  message_type: wsMsg.message_type,
+                  created_at: wsMsg.created_at,
+                  image: wsMsg.image,
+                  sender_id: wsMsg.sender_id,
+                  // We don't have the full sender participant object, but that's okay for the cache.
+                  // The `select` function in `useQuery` will handle transforming this.
+                  // This is a simplification to make the cache update work.
+                };
+                return [...filteredData, newMessage];
             });
             
             queryClient.invalidateQueries({ queryKey: ['chats'] });
@@ -182,7 +189,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               const messageIdToUpdate = data.message_id.toString();
               queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) =>
                   oldData.map(m => {
-                      const senderId = 'sender' in m ? m.sender.id : m.sender_id;
+                      const senderId = m.sender ? m.sender.id : m.sender_id;
                       if (senderId === getCurrentUserId() && m.status !== 'read' && parseInt(m.id.toString(), 10) <= parseInt(messageIdToUpdate, 10)) {
                          return { ...m, status: 'read' };
                       }

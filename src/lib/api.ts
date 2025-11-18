@@ -149,12 +149,10 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
 }
 
 // This function now handles both REST API and WebSocket message shapes
-export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatId: string): Message {
-    console.log("TRANSFORM: Input to transformApiMessage", apiMsg);
+export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
     const currentUserId = getCurrentUserId();
-
-    // Determine sender based on which shape the object is
-    const senderId = 'sender' in apiMsg ? apiMsg.sender.id : apiMsg.sender_id;
+    
+    const senderId = apiMsg.sender ? apiMsg.sender.id : apiMsg.sender_id;
   
     // Robustly parse the timestamp
     const rawTimestamp = apiMsg.created_at;
@@ -165,20 +163,19 @@ export function transformApiMessage(apiMsg: ApiMessage | WsMessagePayload, chatI
         console.error("TRANSFORM: Created Invalid Date from", rawTimestamp);
     }
     
-    const textContent = 'content' in apiMsg ? apiMsg.content : apiMsg.message;
+    const textContent = apiMsg.content || apiMsg.message || '';
     
     const transformedMessage: Message = {
       id: apiMsg.id.toString(),
       chatId: chatId,
       sender: senderId === currentUserId ? 'me' : 'contact',
       type: apiMsg.message_type === 'image' ? 'image' : 'text',
-      text: textContent || '',
+      text: textContent,
       imageUrl: apiMsg.image || null,
       timestamp: timestamp,
-      status: senderId === currentUserId ? ('status' in apiMsg ? apiMsg.status : 'read') : undefined, // Simplification
+      status: senderId === currentUserId ? (apiMsg.status || 'read') : undefined,
     };
 
-    console.log("TRANSFORM: Output of transformApiMessage", transformedMessage);
     return transformedMessage;
 };
 
