@@ -82,7 +82,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ message_type: 'ping' }));
             }
-        }, 30000); // every 30 seconds
+        }, 10000); // every 30 seconds
       };
 
       socket.onmessage = (event) => {

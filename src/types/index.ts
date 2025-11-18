@@ -42,6 +42,7 @@ export type Chat = {
     participants: Participant[];
     chat_display_name: string;
     created_at: string;
+    last_message:string
 }
 
 export type CreateChatPayload = {

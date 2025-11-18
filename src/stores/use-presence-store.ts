@@ -1,5 +1,5 @@
 
-import create from 'zustand';
+import { create } from 'zustand';
 import type { PresenceState } from '@/types';
 
 export const usePresenceStore = create<PresenceState>((set, get) => ({

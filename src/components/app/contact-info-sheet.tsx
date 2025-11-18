@@ -12,6 +12,7 @@ import { BellOff, Ban, X, Copy, Pencil, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { updateContact } from '@/lib/api';
+import { usePresenceStore } from '@/stores/use-presence-store';
 
 interface ContactInfoSheetProps {
   participant: Participant;
@@ -25,6 +26,15 @@ export default function ContactInfoSheet({ participant, open, onOpenChange }: Co
 
   const [displayName, setDisplayName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
+
+  const { isOnline } = usePresenceStore();  
+
+  const isParticipantOnline = participant ? isOnline(participant.id) : false;
+
+  const getStatusText = () => {
+    if (isParticipantOnline) return 'Online';
+    return 'Offline';
+  };
   
   useEffect(() => {
     if (participant) {
@@ -60,7 +70,7 @@ export default function ContactInfoSheet({ participant, open, onOpenChange }: Co
     } else {
       setIsEditingName(false);
     }
-  };
+  }; 
 
 
   if (!participant) return null;
@@ -121,7 +131,7 @@ export default function ContactInfoSheet({ participant, open, onOpenChange }: Co
                   </Button>
               </div>
             )}
-            <p className="text-muted-foreground">Online</p>
+            <p className="text-muted-foreground">{ getStatusText() }</p>
             </div>
             <Separator />
             <div className="px-6 py-4 space-y-4">

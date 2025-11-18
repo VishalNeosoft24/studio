@@ -151,7 +151,7 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                   <div className="font-medium truncate">{name}</div>
                   <div className="text-sm text-muted-foreground truncate">
                     {/* Placeholder for last message */}
-                    Last message...
+                    {chat.last_message?.content}
                   </div>
                 </div>
               </button>
