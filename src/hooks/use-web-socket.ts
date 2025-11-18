@@ -145,7 +145,7 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
             const wsMsg: WsMessagePayload = data.message;
             
-            // Critical fix: ensure created_at exists before processing
+            // Critical check to ensure timestamp exists
             if (!wsMsg.created_at) {
               console.error("Received chat message with invalid timestamp:", wsMsg);
               return;
@@ -164,10 +164,8 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
               if (oldData.some(msg => msg.id === wsMsg.id.toString())) {
                 return oldData;
               }
-              // Robust timestamp parsing
-              const validTimestamp = (wsMsg.created_at || '').includes('T') 
-                ? wsMsg.created_at 
-                : (wsMsg.created_at || '').replace(' ', 'T') + 'Z';
+              // Robust timestamp parsing. THIS IS THE CRITICAL FIX.
+              const validTimestamp = wsMsg.created_at.replace(' ', 'T') + 'Z';
               
               const newMessage: Message = {
                 id: wsMsg.id.toString(),
@@ -193,14 +191,15 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
                   : m
               )
             );
-          } else if (data.type === 'read_notification') {
-            queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
-              oldData.map(m => 
-                m.id === data.message_id.toString() 
-                  ? { ...m, status: 'read' } 
-                  : m
-              )
-            );
+          } else if (data.type === 'read_notification' || data.type === 'message_read') {
+              const messageIdToUpdate = data.message_id.toString();
+              queryClient.setQueryData<Message[]>(['messages', chatId], (oldData = []) =>
+                  oldData.map(m =>
+                      m.sender === 'me' && m.status !== 'read' && m.id <= messageIdToUpdate
+                          ? { ...m, status: 'read' }
+                          : m
+                  )
+              );
           } else if (data.type === 'presence_update' || (data.event_type === 'presence_update' && data.payload)) {
             const payload = data.type === 'presence_update' ? data : data.payload;
             setPresence(payload.user_id, payload.is_online, payload.last_seen);
