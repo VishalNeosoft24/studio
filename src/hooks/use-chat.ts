@@ -60,7 +60,9 @@ export function useChat(chatId: string) {
     if (!token || !chatId) return;
 
     const connect = () => {
-      const ws = new WebSocket(`${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`);
+      const ws = new WebSocket(
+        `ws://127.0.0.1:8000/ws/chat/${chatId}/?token=${token}`
+      );
       wsRef.current = ws;
 
       ws.onopen = () => console.log("WS Connected");
