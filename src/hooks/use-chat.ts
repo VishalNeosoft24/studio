@@ -61,7 +61,7 @@ export function useChat(chatId: string) {
 
     const connect = () => {
       const ws = new WebSocket(
-        `${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`
+        `${WS_BASE_URL}/chat/${chatId}/?token=${token}`
       );
       wsRef.current = ws;
 
