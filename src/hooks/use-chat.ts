@@ -1,12 +1,12 @@
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { ChatMessage, Chat } from '@/types';
+import type { ChatMessage, Chat, Participant } from '@/types';
 import { getCurrentUserId } from "@/lib/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
+
 
 export function useChat(chatId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -64,6 +64,7 @@ export function useChat(chatId: string) {
     if (!token || !chatId) return;
 
     const connect = () => {
+      // FIX: Removed duplicate /ws/
       const ws = new WebSocket(
         `${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`
       );
@@ -102,7 +103,11 @@ export function useChat(chatId: string) {
 
     connect();
 
-    return () => wsRef.current?.close();
+    return () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.close();
+        }
+    };
   }, [chatId, token, currentUserId]);
 
   const handleIncomingMessage = (raw: any) => {
@@ -131,7 +136,7 @@ export function useChat(chatId: string) {
   };
   
   const handleReadUpdateForAll = (messageId: number | string, readerId: number) => {
-      if (readerId === currentUserId) return; // Don't update status for my own read events
+      if (readerId === currentUserId) return;
       setMessages(prev =>
           prev.map(m => {
               if (m.sender === currentUserId && m.status !== 'read' && Number(m.id) <= Number(messageId)) {
@@ -175,6 +180,9 @@ export function useChat(chatId: string) {
   };
 
   const sendMessage = useCallback((text: string) => {
+    // FIX: Check WebSocket state before sending
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+
     const temp_id = Date.now().toString();
     const optimistic: ChatMessage = {
       id: temp_id,
@@ -196,6 +204,8 @@ export function useChat(chatId: string) {
   }, [currentUserId]);
 
   const sendTyping = useCallback((isTyping: boolean) => {
+    // FIX: Check WebSocket state before sending
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     wsRef.current?.send(
       JSON.stringify({
         message_type: "typing",
@@ -205,6 +215,8 @@ export function useChat(chatId: string) {
   }, []);
 
   const sendReadStatus = useCallback((messageId: number | string) => {
+    // FIX: Check WebSocket state before sending
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     if (readSentSet.current.has(messageId)) return;
     readSentSet.current.add(messageId);
     wsRef.current?.send(
