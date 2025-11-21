@@ -6,7 +6,7 @@ import type { ChatMessage, Chat } from '@/types';
 import { getCurrentUserId } from "@/lib/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000/ws';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
 
 export function useChat(chatId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -65,7 +65,7 @@ export function useChat(chatId: string) {
 
     const connect = () => {
       const ws = new WebSocket(
-        `${WS_BASE_URL}/chat/${chatId}/?token=${token}`
+        `${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`
       );
       wsRef.current = ws;
 
