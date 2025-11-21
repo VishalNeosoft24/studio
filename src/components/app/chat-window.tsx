@@ -17,9 +17,8 @@ import ContactInfoSheet from './contact-info-sheet';
 import { getCurrentUserId } from '@/lib/api';
 import { useChat } from '@/hooks/use-chat';
 import MessageBubble from './message-bubble';
-import type { Chat, Participant, ChatMessage } from '@/types';
+import type { Chat, Participant } from '@/types';
 import CameraViewDialog from './camera-view-dialog';
-
 
 interface ChatWindowProps {
   chat: Chat;
@@ -42,14 +41,13 @@ function ChatWindow({ chat }: ChatWindowProps) {
     messages,
     typingUsers,
     sendMessage,
+    sendImageMessage,
     sendTyping,
     sendReadStatus,
     presence,
-    chatInfo,
-    wsRef
   } = useChat(chat.id);
 
-  const otherParticipant = chatInfo?.participants?.find(p => p.id !== currentUserId);
+  const otherParticipant = chat.participants?.find(p => p.id !== currentUserId);
 
   useEffect(() => {
     if (bottomRef.current) {
@@ -69,9 +67,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setText(newValue);
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-        sendTyping(newValue.length > 0);
-    }
+    sendTyping(newValue.length > 0);
   };
   
   const handleEmojiSelect = (emoji: EmojiClickData) => {
@@ -82,9 +78,35 @@ function ChatWindow({ chat }: ChatWindowProps) {
     toast({ title, description: description || 'This feature is not yet implemented.' });
   };
   
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      sendImageMessage(file);
+    }
+  };
+
+  const dataURLtoFile = (dataurl: string, filename: string): File => {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) throw new Error("Invalid Data URL");
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  };
+
+  const handleCapture = (dataUrl: string) => {
+    const file = dataURLtoFile(dataUrl, `capture-${Date.now()}.png`);
+    sendImageMessage(file);
+  };
+
   const toggleMute = () => {
     setIsMuted(!isMuted);
-    toast({ title: !isMuted ? `Notifications muted for ${chatInfo?.chat_display_name}` : `Notifications unmuted for ${chatInfo?.chat_display_name}` });
+    toast({ title: !isMuted ? `Notifications muted for ${chat.chat_display_name}` : `Notifications unmuted for ${chat.chat_display_name}` });
   };
 
   const toggleBlock = () => {
@@ -108,7 +130,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
 
   const otherParticipantSafe: Participant = otherParticipant || { id: -1, username: 'Unknown', phone_number: 'N/A', profile_picture_url: null, display_name: 'Unknown', is_online: false, last_seen: null };
 
-  if (!chatInfo) {
+  if (!chat) {
     return (
       <div className="flex justify-center items-center h-full">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -119,7 +141,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
   return (
     <>
       <ContactInfoSheet participant={otherParticipantSafe} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
-      <CameraViewDialog open={isCameraOpen} onOpenChange={setCameraOpen} onCapture={(d) => showToast('Image sending not implemented')} />
+      <CameraViewDialog open={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={handleCapture} />
 
       <Card className="flex flex-col h-full w-full rounded-none border-none shadow-none bg-transparent">
         <CardHeader className="p-3 border-b bg-secondary flex-row items-center justify-between">
@@ -140,10 +162,10 @@ function ChatWindow({ chat }: ChatWindowProps) {
               <div className="flex items-center">
                 <Avatar className="h-10 w-10 mr-3 relative cursor-pointer" onClick={() => setContactInfoOpen(true)}>
                   <AvatarImage src={otherParticipantSafe.profile_picture_url ?? undefined} alt={otherParticipantSafe.username} />
-                  <AvatarFallback>{chatInfo?.chat_display_name?.charAt(0).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{chat.chat_display_name?.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="cursor-pointer" onClick={() => setContactInfoOpen(true)}>
-                  <h2 className="font-semibold flex items-center">{chatInfo?.chat_display_name} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
+                  <h2 className="font-semibold flex items-center">{chat.chat_display_name} {isMuted && <BellOff className="h-4 w-4 ml-2 text-muted-foreground"/>}</h2>
                   <p className="text-xs text-muted-foreground">{getStatusText()}</p>
                 </div>
               </div>
@@ -247,7 +269,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
                     className="flex-1 bg-background border-input focus-visible:ring-primary rounded-full px-4 h-10"
                     autoComplete="off"
                 />
-                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={() => showToast('Image sending not implemented')} />
+                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
                 <Button type="submit" size="icon" className={`rounded-full w-12 h-12 flex-shrink-0 ${text.trim() ? "bg-[#128C7E]" : "bg-[#25D366]"}`}>
                     {text.trim() ? <SendHorizonal /> : <Mic />}
                     <span className="sr-only">Send</span>

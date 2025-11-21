@@ -1,9 +1,10 @@
 
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { ChatMessage, Chat, Participant } from '@/types';
-import { getCurrentUserId } from '@/lib/api';
+import type { ChatMessage } from '@/types';
+import { getCurrentUserId, getMessages, sendImage } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
@@ -13,7 +14,6 @@ export function useChat(chatId: string) {
   const [typingUsers, setTypingUsers] = useState<number[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const [presence, setPresence] = useState<Record<number, { is_online: boolean; last_seen: string | null; }>>({});
-  const [chatInfo, setChatInfo] = useState<Chat | null>(null);
   
   const currentUserId = getCurrentUserId();
   const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") : null;
@@ -29,25 +29,14 @@ export function useChat(chatId: string) {
   useEffect(() => {
     if (!token || !chatId) return;
 
-    // Fetch initial chat details
-    fetch(`${API_BASE_URL}/chats/${chatId}/`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => res.json())
-      .then(data => setChatInfo(data))
-      .catch(err => console.error("Failed to fetch chat details:", err));
-
-    // Fetch message history
-    fetch(`${API_BASE_URL}/chats/${chatId}/messages/`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then((data: any[]) => {
+    getMessages(chatId)
+      .then((data) => {
         const formatted = data.map((raw: any) => ({
           id: raw.id,
           content: raw.content,
           sender: raw.sender.id,
           created_at: raw.created_at,
+          image_url: raw.image,
           status: raw.sender.id === currentUserId ? evaluateStatus(raw.message_status) : undefined,
           pending: false,
         }));
@@ -61,14 +50,13 @@ export function useChat(chatId: string) {
 
     const connect = () => {
       const ws = new WebSocket(
-        `${WS_BASE_URL}/chat/${chatId}/?token=${token}`
+        `${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`
       );
       wsRef.current = ws;
 
       ws.onopen = () => console.log("WS Connected");
       ws.onclose = (e) => {
         console.log("WS Disconnected, attempting to reconnect...", e.code, e.reason);
-        // Don't reconnect on normal close
         if (e.code !== 1000) {
             setTimeout(connect, 5000);
         }
@@ -116,6 +104,7 @@ export function useChat(chatId: string) {
       id: raw.id,
       temp_id: raw.temp_id,
       content: raw.message,
+      image_url: raw.image_url,
       sender: raw.sender_id,
       created_at: raw.created_at,
       pending: false,
@@ -124,13 +113,9 @@ export function useChat(chatId: string) {
 
     setMessages(prev => {
       if (isOwn) {
-        // Replace optimistic message with confirmed one
         return prev.map(m => m.temp_id === raw.temp_id ? incoming : m);
       }
-      
-      // Prevent duplicates for incoming messages from others
       if (prev.some(m => m.id === incoming.id)) return prev;
-      
       return [...prev, incoming];
     });
   };
@@ -202,6 +187,42 @@ export function useChat(chatId: string) {
     );
   }, [currentUserId]);
 
+  const sendImageMessage = useCallback(async (file: File) => {
+    if (!currentUserId) return;
+    
+    const temp_id = Date.now().toString();
+    const previewUrl = URL.createObjectURL(file);
+
+    const optimisticMessage: ChatMessage = {
+      id: temp_id,
+      temp_id: temp_id,
+      content: '', // Or a caption if you have one
+      image_url: previewUrl,
+      sender: currentUserId,
+      status: 'sending',
+      pending: true,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, optimisticMessage]);
+
+    try {
+      // The REST API call will trigger the WebSocket broadcast from the backend
+      await sendImage(chatId, file, temp_id);
+    } catch (error) {
+      console.error("Image upload failed:", error);
+      // Handle failed upload: remove optimistic message or mark as failed
+      setMessages(prev => prev.map(msg => 
+        msg.id === temp_id ? { ...msg, status: 'sent', pending: false, content: "Failed to send image." } : msg
+      ));
+    } finally {
+      // It's a good practice to revoke the object URL to free up memory
+      // But we need to be careful not to do it before the final image is loaded
+      // We will rely on WS message to replace this one. If WS fails, this might be an issue.
+    }
+  }, [chatId, currentUserId]);
+
+
   const sendTyping = useCallback((isTyping: boolean) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     wsRef.current?.send(
@@ -228,10 +249,10 @@ export function useChat(chatId: string) {
     messages,
     typingUsers,
     sendMessage,
+    sendImageMessage,
     sendTyping,
     sendReadStatus,
     presence,
-    chatInfo,
     wsRef,
   };
 }

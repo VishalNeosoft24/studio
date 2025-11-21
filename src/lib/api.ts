@@ -1,5 +1,6 @@
 
-import type { User, Chat, ApiMessage, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
+
+import type { User, Chat, ApiMessage, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload, ChatMessage } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -90,7 +91,13 @@ export async function getUserPresence(user_id:number){
 }
 
 export async function getChats(): Promise<Chat[]> {
-  return await apiFetch("/chats/");
+  const chats: Chat[] = await apiFetch("/chats/");
+  // Sort chats by the created_at timestamp of the last message, descending
+  return chats.sort((a, b) => {
+    if (!a.last_message?.created_at) return 1;
+    if (!b.last_message?.created_at) return -1;
+    return new Date(b.last_message.created_at).getTime() - new Date(a.last_message.created_at).getTime();
+  });
 }
 
 export async function createChat(payload: CreateChatPayload): Promise<Chat> {
@@ -147,6 +154,19 @@ export async function updateContact(contactId: number, payload: UpdateContactPay
 export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
+
+export async function sendImage(chatId: string, file: File, temp_id: string): Promise<ChatMessage> {
+  const formData = new FormData();
+  formData.append('chat_id', chatId);
+  formData.append('image', file);
+  formData.append('temp_id', temp_id);
+
+  return await apiFetch(`/chats/messages/send-image/`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 
 export async function login(username: string, password: string) {
     console.log('Attempting login for:', username);
@@ -208,6 +228,3 @@ export function logout() {
         console.log('User logged out, tokens removed.');
     }
 }
-      
-      
-      

@@ -71,7 +71,8 @@ export type ApiMessage = {
     message?: string; // WebSocket
     message_type: 'text' | 'image' | 'file';
     created_at: string;
-    image?: string | null;
+    image_url?: string | null;
+    image?: string | null; // from REST
     message_status?: Array<{ status: string }>;
     temp_id?: string;
 };
@@ -85,6 +86,7 @@ export interface ChatMessage {
   temp_id?: number | string;
   status?: 'sent' | 'delivered' | 'read' | 'sending';
   pending?: boolean;
+  image_url?: string | null;
 }
 
 
