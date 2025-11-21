@@ -24,38 +24,56 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const sendMessage = useCallback((messageText: string) => {
-    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
-      console.error('WebSocket is not open. Cannot send message.');
-      return false;
-    }
+  if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+    console.error('WebSocket is not open. Cannot send message.');
+    return false;
+  }
 
-    const tempId = `temp-${Date.now()}-${Math.random()}`;
-    const currentTime = new Date();
+  const tempId = `temp-${Date.now()}-${Math.random()}`;
+  const currentTime = new Date();
 
-    const optimisticMessage: ApiMessage = {
-      id: tempId,
-      temp_id: tempId,
-      sender_id: getCurrentUserId()!,
-      content: messageText,
-      message_type: 'text',
-      created_at: currentTime.toISOString(),
-      image: null,
-      status: 'sending',
-    };
+  // Build an optimistic ApiMessage-like object (for server compatibility), but convert
+  // it to the client Message shape so UI renders immediately.
+  const optimisticApi: ApiMessage = {
+    id: tempId,
+    temp_id: tempId,
+    sender_id: getCurrentUserId()!,
+    content: messageText,
+    message_type: 'text',
+    created_at: currentTime.toISOString(),
+    image: null,
+    status: 'sending',
+  };
 
-    queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (old = []) => {
-        return [...old, optimisticMessage];
-    });
+  // Convert to UI Message with transformApiMessage (so timestamp is a Date, field names match)
+  const optimisticUi = transformApiMessage(optimisticApi as ApiMessage, chatId);
 
-    const payload = JSON.stringify({ 
-      message_type: "text", 
-      message: messageText, 
-      temp_id: tempId 
-    });
-    ws.current.send(payload);
-    console.log("⬆️ WS sent (text):", payload);
-    return true;
-  }, [chatId, queryClient]);
+  // Add optimistic UI message directly to the cache (same shape as normal messages)
+  queryClient.setQueryData<Message[]>(['messages', chatId], (old = []) => {
+    return [...old, optimisticUi];
+  });
+
+  const payload = JSON.stringify({
+    message_type: "text",
+    message: messageText,
+    temp_id: tempId
+  });
+
+  ws.current.send(payload);
+  console.log("⬆️ WS sent (text):", payload);
+  return true;
+}, [chatId, queryClient]);
+
+
+
+
+
+
+
+
+
+
+  
 
   const sendImage = useCallback((imageData: string, imageCaption: string) => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
@@ -145,39 +163,44 @@ export function useWebSocket(chatId: string, queryClient: QueryClient): WebSocke
           console.log("📩 WS received:", data);
 
           if ((data.type === 'chat_message' || data.type === 'chat.message') && data.message) {
-            const wsMsg: WsMessagePayload = data.message;
-            
+            const wsMsg = data.message as WsMessagePayload;
+
             if (!wsMsg.created_at) {
               console.error("Received chat message with invalid timestamp:", wsMsg);
               return;
             }
-            
-            queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) => {
-                const filteredData = wsMsg.temp_id ? oldData.filter(m => m.id !== wsMsg.temp_id) : oldData;
-                
-                // Ensure we don't add duplicates
-                if (filteredData.some(msg => msg.id === wsMsg.id)) {
-                  return filteredData;
-                }
-                
-                // Add the new message, ensuring it conforms to ApiMessage shape for consistency
-                const newMessage: ApiMessage = {
-                  id: wsMsg.id,
-                  content: wsMsg.message,
-                  message_type: wsMsg.message_type,
-                  created_at: wsMsg.created_at,
-                  image: wsMsg.image,
-                  sender_id: wsMsg.sender_id,
-                  // We don't have the full sender participant object, but that's okay for the cache.
-                  // The `select` function in `useQuery` will handle transforming this.
-                  // This is a simplification to make the cache update work.
-                };
-                return [...filteredData, newMessage];
-            });
-            
-            queryClient.invalidateQueries({ queryKey: ['chats'] });
 
-          } else if (data.type === 'delivery_status') {
+            // Convert server ApiMessage -> UI Message
+            const incomingUi = transformApiMessage({
+              id: wsMsg.id,
+              temp_id: wsMsg.temp_id ?? null,
+              sender_id: wsMsg.sender_id,
+              content: wsMsg.message,
+              message_type: wsMsg.message_type,
+              created_at: wsMsg.created_at,
+              image: wsMsg.image ?? null,
+              status: wsMsg.status ?? undefined,
+            } as ApiMessage, chatId);
+
+            queryClient.setQueryData<Message[]>(['messages', chatId], (old = []) => {
+              // remove any optimistic message with same temp_id then add/replace
+              let filtered = old;
+              if (wsMsg.temp_id) {
+                filtered = old.filter(m => (m.id?.toString() !== wsMsg.temp_id?.toString()));
+              }
+
+              // If the message with the real id is already present, avoid duplicate
+              if (filtered.some(m => m.id?.toString() === incomingUi.id?.toString())) {
+                return filtered;
+              }
+
+              return [...filtered, incomingUi];
+            });
+
+            // update chat list preview, etc.
+            queryClient.invalidateQueries({ queryKey: ['chats'] });
+            
+          }else if (data.type === 'delivery_status') {
              queryClient.setQueryData<ApiMessage[]>(['messages', chatId], (oldData = []) =>
                 oldData.map(m => 
                   m.id.toString() === data.message_id.toString() && m.status !== 'read'

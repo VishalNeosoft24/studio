@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload, WsMessagePayload } from '@/types';
+import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -148,36 +148,34 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-// This function now handles both REST API and WebSocket message shapes
-export function transformApiMessage(apiMsg: ApiMessage, chatId: string): Message {
-    const currentUserId = getCurrentUserId();
-    
-    const senderId = apiMsg.sender ? apiMsg.sender.id : apiMsg.sender_id;
-  
-    // Robustly parse the timestamp
-    const rawTimestamp = apiMsg.created_at;
-    const validTimestampStr = (rawTimestamp || '').replace(' ', 'T') + 'Z';
-    const timestamp = new Date(validTimestampStr);
+export function transformApiMessage(apiMsg: any, chatId: string): Message {
+  const currentUserId = getCurrentUserId();
 
-    if (isNaN(timestamp.getTime())) {
-        console.error("TRANSFORM: Created Invalid Date from", rawTimestamp);
-    }
-    
-    const textContent = apiMsg.content || apiMsg.message || '';
-    
-    const transformedMessage: Message = {
-      id: apiMsg.id.toString(),
-      chatId: chatId,
-      sender: senderId === currentUserId ? 'me' : 'contact',
-      type: apiMsg.message_type === 'image' ? 'image' : 'text',
-      text: textContent,
-      imageUrl: apiMsg.image || null,
-      timestamp: timestamp,
-      status: senderId === currentUserId ? (apiMsg.status || 'read') : undefined,
-    };
+  // If no timestamp, fallback to now
+  const rawTs = apiMsg.created_at || new Date().toISOString();
 
-    return transformedMessage;
-};
+  const validTimestamp = rawTs.includes("T")
+      ? rawTs
+      : `${rawTs.replace(" ", "T")}Z`;
+
+  const senderId =
+      apiMsg.sender?.id ??
+      apiMsg.sender_id ??
+      null;
+
+  return {
+    id: apiMsg.id ? apiMsg.id.toString() : apiMsg.temp_id ?? `temp-${Date.now()}`,
+    chatId,
+    sender: senderId === currentUserId ? "me" : "contact",
+    type: apiMsg.message_type === "image" ? "image" : "text",
+    text: apiMsg.content || "",
+    imageUrl: apiMsg.image || null,
+    timestamp: new Date(validTimestamp),
+    status: senderId === currentUserId ? apiMsg.status || "sent" : undefined,
+  };
+}
+
+
 
 export async function login(username: string, password: string) {
     console.log('Attempting login for:', username);

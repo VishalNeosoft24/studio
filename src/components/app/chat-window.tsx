@@ -70,10 +70,30 @@ function ChatWindow({ chat }: ChatWindowProps) {
   
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<ApiMessage[], Error, Message[]>({
     queryKey: ['messages', chat.id],
-    queryFn: () => getMessages(chat.id),
-    select: (data) => data.map((msg) => transformApiMessage(msg, chat.id)).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
-    staleTime: 5000,
+    queryFn: async () => {
+      const res = await getMessages(chat.id);
+      console.log("🚩 API messages:", res);
+      return res;
+    },
+select: (data) => {
+  console.log("🔥 RAW FROM API:", data);
+
+  const mapped = data.map((msg) => {
+    const t = transformApiMessage(msg, chat.id);
+    if (!t) console.warn("❌ TRANSFORM DROPPED:", msg);
+    return t;
   });
+
+  console.log("🧠 TRANSFORMED:", mapped);
+
+  return mapped
+    .filter(Boolean)
+    .sort((a, b) => a.timestamp - b.timestamp);
+},    staleTime: 5000,
+  });
+
+  console.log("🎯 ChatWindow messages:", messages.length, messages);
+
   
   const { sendMessage, sendImage, sendTyping, sendReadReceipt, isConnected } = useWebSocket(chat.id, queryClient);
 
@@ -154,6 +174,9 @@ function ChatWindow({ chat }: ChatWindowProps) {
                  <Image src={msg.imageUrl} alt="Sent image" layout="fill" objectFit="cover" className="rounded-md" />
               </div>
           )}
+          <div className="bg-red-200 p-2 text-black">
+                  RENDERED MESSAGES: {messages.length}
+                </div>
           {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
           <div className={`flex items-center gap-1 mt-1 ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
             <span className="text-xs text-muted-foreground">
@@ -273,6 +296,8 @@ function ChatWindow({ chat }: ChatWindowProps) {
               <React.Fragment key={msg.id}>
                 {showDateSeparator && <DateSeparator date={msg.timestamp} />}
                 <MessageBubble msg={msg} />
+                
+
               </React.Fragment>
             )})}
             </div>
