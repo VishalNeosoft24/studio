@@ -251,7 +251,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
                     <DropdownMenuContent align="start">
                         <DropdownMenuItem onClick={() => showToast('Document sending not implemented')}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
                         <DropdownMenuItem onClick={() => fileInputRef.current?.click()}><ImageIconLucide className="mr-2 h-4 w-4" /><span>Gallery</span></DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setCameraOpen(true)}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsCameraOpen(true)}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
                         <DropdownMenuItem onClick={() => showToast('Audio sending not implemented')}><Music className="mr-2 h-4 w-4" /><span>Audio</span></DropdownMenuItem>
                         <DropdownMenuItem onClick={() => showToast('Location sending not implemented')}><MapPin className="mr-2 h-4 w-4" /><span>Location</span></DropdownMenuItem>
                         <DropdownMenuItem onClick={() => showToast('Contact sharing not implemented')}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
