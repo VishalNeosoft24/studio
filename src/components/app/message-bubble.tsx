@@ -17,6 +17,7 @@ export default function MessageBubble({ msg, currentUserId, showDateBanner, onVi
   const isMine = msg.sender === currentUserId;
   const ref = useRef<HTMLDivElement | null>(null);
 
+  // Fallback to current time for optimistic messages
   const messageDate = msg.created_at ? new Date(msg.created_at) : new Date();
 
   const renderDateBanner = () => {

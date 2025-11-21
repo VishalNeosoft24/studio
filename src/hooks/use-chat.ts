@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import type { ChatMessage, Chat } from '@/types';
-import { getCurrentUserId } from "@/lib/api";
+import { useEffect, useRef, useState, useCallback } from 'react';
+import type { ChatMessage, Chat, Participant } from '@/types';
+import { getCurrentUserId } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
@@ -14,7 +14,7 @@ export function useChat(chatId: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const [presence, setPresence] = useState<Record<number, { is_online: boolean; last_seen: string | null; }>>({});
   const [chatInfo, setChatInfo] = useState<Chat | null>(null);
-
+  
   const currentUserId = getCurrentUserId();
   const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") : null;
   const readSentSet = useRef<Set<number | string>>(new Set());
@@ -61,14 +61,17 @@ export function useChat(chatId: string) {
 
     const connect = () => {
       const ws = new WebSocket(
-        `ws://127.0.0.1:8000/ws/chat/${chatId}/?token=${token}`
+        `${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`
       );
       wsRef.current = ws;
 
       ws.onopen = () => console.log("WS Connected");
-      ws.onclose = () => {
-        console.log("WS Disconnected, attempting to reconnect...");
-        setTimeout(connect, 5000);
+      ws.onclose = (e) => {
+        console.log("WS Disconnected, attempting to reconnect...", e.code, e.reason);
+        // Don't reconnect on normal close
+        if (e.code !== 1000) {
+            setTimeout(connect, 5000);
+        }
       };
       ws.onerror = (e) => console.error("WS ERROR:", e);
 
@@ -103,6 +106,7 @@ export function useChat(chatId: string) {
         wsRef.current.close();
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, token]);
 
   const handleIncomingMessage = (raw: any) => {
@@ -115,12 +119,12 @@ export function useChat(chatId: string) {
       sender: raw.sender_id,
       created_at: raw.created_at,
       pending: false,
-      status: isOwn ? 'sent' : undefined,
+      status: 'sent',
     };
 
     setMessages(prev => {
       if (isOwn) {
-        // Swap optimistic message with confirmed one
+        // Replace optimistic message with confirmed one
         return prev.map(m => m.temp_id === raw.temp_id ? incoming : m);
       }
       
@@ -228,5 +232,6 @@ export function useChat(chatId: string) {
     sendReadStatus,
     presence,
     chatInfo,
+    wsRef,
   };
 }

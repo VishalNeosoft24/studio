@@ -7,7 +7,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
-import { SendHorizonal, MoreVertical, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle, Paperclip, Mic } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
+import { SendHorizonal, MoreVertical, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle, Paperclip, Mic, Smile, FileText, ImageIcon as ImageIconLucide, User, Vote, Music, MapPin, CalendarPlus } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +17,9 @@ import ContactInfoSheet from './contact-info-sheet';
 import { getCurrentUserId } from '@/lib/api';
 import { useChat } from '@/hooks/use-chat';
 import MessageBubble from './message-bubble';
-import type { Chat, Participant } from '@/types';
+import type { Chat, Participant, ChatMessage } from '@/types';
+import CameraViewDialog from './camera-view-dialog';
+
 
 interface ChatWindowProps {
   chat: Chat;
@@ -31,6 +35,8 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [isCameraOpen, setCameraOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     messages,
@@ -40,13 +46,14 @@ function ChatWindow({ chat }: ChatWindowProps) {
     sendReadStatus,
     presence,
     chatInfo,
+    wsRef
   } = useChat(chat.id);
 
   const otherParticipant = chatInfo?.participants?.find(p => p.id !== currentUserId);
 
   useEffect(() => {
     if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+      bottomRef.current.scrollIntoView({ behavior: 'auto' });
     }
   }, [messages]);
 
@@ -66,6 +73,10 @@ function ChatWindow({ chat }: ChatWindowProps) {
         sendTyping(newValue.length > 0);
     }
   };
+  
+  const handleEmojiSelect = (emoji: EmojiClickData) => {
+    setText(prevInput => prevInput + emoji.emoji);
+  };
 
   const showToast = (title: string, description?: string) => {
     toast({ title, description: description || 'This feature is not yet implemented.' });
@@ -84,9 +95,10 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const getStatusText = () => {
     if (isBlocked) return 'Blocked';
     if (typingUsers.length > 0) return 'typing...';
-    if (presence[otherParticipant?.id]?.is_online) return 'Online';
-    if (presence[otherParticipant?.id]?.last_seen) {
-        return `Last seen at ${new Date(presence[otherParticipant?.id]?.last_seen).toLocaleTimeString([], {
+    const otherParticipantPresence = presence[otherParticipant?.id ?? -1];
+    if (otherParticipantPresence?.is_online) return 'Online';
+    if (otherParticipantPresence?.last_seen) {
+        return `Last seen at ${new Date(otherParticipantPresence.last_seen).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
         })}`
@@ -107,6 +119,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
   return (
     <>
       <ContactInfoSheet participant={otherParticipantSafe} open={isContactInfoOpen} onOpenChange={setContactInfoOpen} />
+      <CameraViewDialog open={isCameraOpen} onOpenChange={setCameraOpen} onCapture={(d) => showToast('Image sending not implemented')} />
 
       <Card className="flex flex-col h-full w-full rounded-none border-none shadow-none bg-transparent">
         <CardHeader className="p-3 border-b bg-secondary flex-row items-center justify-between">
@@ -194,19 +207,48 @@ function ChatWindow({ chat }: ChatWindowProps) {
         ) : (
           <CardFooter className="p-3 border-t bg-secondary">
             <form onSubmit={handleSend} className="w-full flex items-center space-x-2">
-                <div className="flex-1 flex items-center bg-white rounded-full shadow-sm">
-                    <Button type="button" variant="ghost" size="icon" className="text-muted-foreground"><Paperclip size={20} /></Button>
-                    <Input
-                        type="text"
-                        placeholder="Type a message"
-                        value={text}
-                        onChange={handleInputChange}
-                        onBlur={() => sendTyping(false)}
-                        className="flex-1 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 h-auto py-2"
-                        autoComplete="off"
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                        <Smile className="h-5 w-5" /><span className="sr-only">Add emoji</span>
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 border-0" side="top" align="start">
+                    <Picker 
+                        onEmojiClick={handleEmojiSelect}
+                        autoFocusSearch={false}
+                        emojiStyle={EmojiStyle.NATIVE}
+                        theme="auto"
                     />
-                </div>
-                <Button type="submit" size="icon" className={`rounded-full w-12 h-12 ${text.trim() ? "bg-[#128C7E]" : "bg-[#25D366]"}`} disabled={!text.trim()}>
+                    </PopoverContent>
+                </Popover>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" type="button" className="text-muted-foreground hover:text-foreground flex-shrink-0"><Paperclip className="h-5 w-5" /><span className="sr-only">Attach file</span></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => showToast('Document sending not implemented')}><FileText className="mr-2 h-4 w-4" /><span>Document</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => fileInputRef.current?.click()}><ImageIconLucide className="mr-2 h-4 w-4" /><span>Gallery</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setCameraOpen(true)}><Camera className="mr-2 h-4 w-4" /><span>Camera</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Audio sending not implemented')}><Music className="mr-2 h-4 w-4" /><span>Audio</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Location sending not implemented')}><MapPin className="mr-2 h-4 w-4" /><span>Location</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Contact sharing not implemented')}><User className="mr-2 h-4 w-4" /><span>Contact</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Polls not implemented')}><Vote className="mr-2 h-4 w-4" /><span>Poll</span></DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => showToast('Events not implemented')}><CalendarPlus className="mr-2 h-4 w-4" /><span>Event</span></DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Input
+                    type="text"
+                    placeholder='Type a message'
+                    value={text}
+                    onChange={handleInputChange}
+                    onBlur={() => sendTyping(false)}
+                    className="flex-1 bg-background border-input focus-visible:ring-primary rounded-full px-4 h-10"
+                    autoComplete="off"
+                />
+                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={() => showToast('Image sending not implemented')} />
+                <Button type="submit" size="icon" className={`rounded-full w-12 h-12 flex-shrink-0 ${text.trim() ? "bg-[#128C7E]" : "bg-[#25D366]"}`}>
                     {text.trim() ? <SendHorizonal /> : <Mic />}
                     <span className="sr-only">Send</span>
                 </Button>
