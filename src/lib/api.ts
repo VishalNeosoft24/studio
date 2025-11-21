@@ -1,5 +1,5 @@
 
-import type { User, Chat, ApiMessage, Message, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
+import type { User, Chat, ApiMessage, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -148,35 +148,6 @@ export async function getMessages(chatId: string): Promise<ApiMessage[]> {
   return await apiFetch(`/chats/${chatId}/messages/`);
 }
 
-export function transformApiMessage(apiMsg: any, chatId: string): Message {
-  const currentUserId = getCurrentUserId();
-
-  // If no timestamp, fallback to now
-  const rawTs = apiMsg.created_at || new Date().toISOString();
-
-  const validTimestamp = rawTs.includes("T")
-      ? rawTs
-      : `${rawTs.replace(" ", "T")}Z`;
-
-  const senderId =
-      apiMsg.sender?.id ??
-      apiMsg.sender_id ??
-      null;
-
-  return {
-    id: apiMsg.id ? apiMsg.id.toString() : apiMsg.temp_id ?? `temp-${Date.now()}`,
-    chatId,
-    sender: senderId === currentUserId ? "me" : "contact",
-    type: apiMsg.message_type === "image" ? "image" : "text",
-    text: apiMsg.content || "",
-    imageUrl: apiMsg.image || null,
-    timestamp: new Date(validTimestamp),
-    status: senderId === currentUserId ? apiMsg.status || "sent" : undefined,
-  };
-}
-
-
-
 export async function login(username: string, password: string) {
     console.log('Attempting login for:', username);
     
@@ -237,3 +208,6 @@ export function logout() {
         console.log('User logged out, tokens removed.');
     }
 }
+      
+      
+      
