@@ -1,5 +1,4 @@
 
-
 // For the UI, simplified
 export type User = {
     id: string | number;
@@ -43,7 +42,7 @@ export type Chat = {
     participants: Participant[];
     chat_display_name: string;
     created_at: string;
-    last_message:string
+    last_message: ChatMessage | null;
 }
 
 export type CreateChatPayload = {
@@ -62,20 +61,20 @@ export type UpdateContactPayload = {
 };
 
 
-// Represents the raw message from your DRF REST API (for old messages)
-// This is now a more flexible type to handle both REST and WS data before transformation.
+// This type represents the raw message object from either the REST API or the WebSocket
 export type ApiMessage = {
-    id: number | string; // Can be string for temp_id
-    sender?: Participant; // Present in REST API
-    sender_id?: number; // Present in WS and for optimistic messages
-    content?: string; // Present in REST API
-    message?: string; // Present in WS
+    id: number;
+    sender: Participant;
+    sender_id?: number;
+    content?: string; // REST API
+    message?: string; // WebSocket
     message_type: 'text' | 'image' | 'file';
     created_at: string;
     image?: string | null;
-    status?: 'sending' | 'sent' | 'delivered' | 'read';
-    temp_id?: string; // For optimistic updates
+    message_status?: Array<{ status: string }>;
+    temp_id?: string;
 };
+
 
 export interface ChatMessage {
   id: number | string;

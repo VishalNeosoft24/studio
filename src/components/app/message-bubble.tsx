@@ -17,7 +17,7 @@ export default function MessageBubble({ msg, currentUserId, showDateBanner, onVi
   const isMine = msg.sender === currentUserId;
   const ref = useRef<HTMLDivElement | null>(null);
 
-  const messageDate = new Date(msg.created_at!);
+  const messageDate = msg.created_at ? new Date(msg.created_at) : new Date();
 
   const renderDateBanner = () => {
       const now = new Date();
@@ -31,14 +31,14 @@ export default function MessageBubble({ msg, currentUserId, showDateBanner, onVi
   };
 
   const StatusIcon = () => {
-    if (msg.status === "sending") return <Check size={16} className="text-gray-400" />;
+    if (msg.status === "sending" || msg.pending) return <Check size={16} className="text-gray-400" />;
     if (msg.status === "read") return <CheckCheck size={16} className="text-[#34B7F1]" />;
     if (msg.status === "delivered") return <CheckCheck size={16} className="text-gray-400" />;
-    return <Check size={16} className="text-gray-400" />;
+    return <Check size={16} className="text-gray-400" />; // sent
   };
 
   useEffect(() => {
-    if (!ref.current || !msg.id || isMine) return;
+    if (!ref.current || !msg.id || isMine || msg.pending) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -53,7 +53,7 @@ export default function MessageBubble({ msg, currentUserId, showDateBanner, onVi
     observer.observe(ref.current);
 
     return () => observer.disconnect();
-  }, [msg.id, isMine, onVisible]);
+  }, [msg.id, isMine, onVisible, msg.pending]);
 
   return (
     <>

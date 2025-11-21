@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,6 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const {
     messages,
@@ -63,10 +62,8 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setText(newValue);
-    if (newValue.length > 0) {
-      sendTyping(true);
-    } else {
-      sendTyping(false);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+        sendTyping(newValue.length > 0);
     }
   };
 
@@ -165,7 +162,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
           )}
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-hidden p-0 relative" ref={containerRef}>
+        <CardContent className="flex-1 overflow-hidden p-0 relative">
           <div className="bg-[#ECE5DD] p-4 space-y-2 h-full overflow-y-auto">
             {messages.map((msg, index) => (
               <MessageBubble

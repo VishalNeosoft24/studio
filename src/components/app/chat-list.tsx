@@ -1,7 +1,7 @@
 
 'use client';
 
-import type { Chat, User } from "@/types";
+import type { Chat, User, ChatMessage } from "@/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,7 @@ import { logout, getCurrentUserId, getProfile } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { useQuery } from '@tanstack/react-query';
 import { Skeleton } from "@/components/ui/skeleton";
+import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 
 
 type ChatListProps = {
@@ -68,6 +69,19 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
       }
       return name.substring(0, 2).toUpperCase();
   }
+
+  const formatLastMessageTimestamp = (timestamp?: string) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (isToday(date)) {
+      return format(date, 'p');
+    }
+    if (isYesterday(date)) {
+      return 'Yesterday';
+    }
+    return format(date, 'P');
+  };
+
 
   return (
     <>
@@ -148,9 +162,13 @@ export default function ChatList({ chats, selectedChatId, onSelectChat }: ChatLi
                   </Avatar>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{name}</div>
+                  <div className="flex justify-between items-center">
+                    <div className="font-medium truncate">{name}</div>
+                    <div className="text-xs text-muted-foreground ml-2">
+                      {formatLastMessageTimestamp(chat.last_message?.created_at)}
+                    </div>
+                  </div>
                   <div className="text-sm text-muted-foreground truncate">
-                    {/* Placeholder for last message */}
                     {chat.last_message?.content}
                   </div>
                 </div>
