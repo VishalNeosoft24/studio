@@ -12,7 +12,8 @@ export function useChat(chatId: string) {
   const [typingUsers, setTypingUsers] = useState<number[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const [presence, setPresence] = useState<Record<number, { is_online: boolean; last_seen: string | null; }>>({});
-  
+  const lastMessageSentByMeRef = useRef(false);
+
   const currentUserId = getCurrentUserId();
   const token = typeof window !== 'undefined' ? localStorage.getItem("access_token") : null;
   const readSentSet = useRef<Set<number | string>>(new Set());
@@ -176,7 +177,8 @@ export function useChat(chatId: string) {
       console.error("Cannot send message, WebSocket is not open.");
       return;
     }
-
+    
+    lastMessageSentByMeRef.current = true;
     const temp_id = Date.now().toString();
     const optimistic: ChatMessage = {
       id: temp_id,
@@ -201,6 +203,7 @@ export function useChat(chatId: string) {
   const sendImageMessage = useCallback(async (file: File) => {
     if (!currentUserId) return;
     
+    lastMessageSentByMeRef.current = true;
     const temp_id = Date.now().toString();
     const previewUrl = URL.createObjectURL(file);
 
@@ -264,5 +267,6 @@ export function useChat(chatId: string) {
     sendReadStatus,
     presence,
     wsRef,
+    lastMessageSentByMeRef,
   };
 }

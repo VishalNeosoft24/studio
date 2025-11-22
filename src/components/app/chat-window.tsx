@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import Picker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
-import { SendHorizonal, MoreVertical, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle, Paperclip, Mic, Smile, FileText, ImageIcon as ImageIconLucide, User, Vote, Music, MapPin, CalendarPlus, Camera } from 'lucide-react';
+import { SendHorizonal, MoreVertical, Video, Info, BellOff, Bell, Trash2, Ban, Download, SquarePlus, Loader2, X, Search, Timer, Wallpaper, AlertTriangle, Paperclip, Mic, Smile, FileText, ImageIcon as ImageIconLucide, User, Vote, Music, MapPin, CalendarPlus, Camera, ChevronDown } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -34,8 +34,11 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const {
     messages,
@@ -45,15 +48,40 @@ function ChatWindow({ chat }: ChatWindowProps) {
     sendTyping,
     sendReadStatus,
     presence,
+    lastMessageSentByMeRef,
   } = useChat(chat.id);
 
   const otherParticipant = chat.participants?.find(p => p.id !== currentUserId);
 
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'auto' });
+    if (messages.length === 0) return;
+
+    const shouldScroll = isAtBottom || lastMessageSentByMeRef.current;
+
+    if (shouldScroll) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      lastMessageSentByMeRef.current = false;
+    } else {
+      // It's a new message from someone else, and we're scrolled up
+      setUnreadCount(prev => prev + 1);
     }
-  }, [messages]);
+  }, [messages, isAtBottom, lastMessageSentByMeRef]);
+
+  const handleScroll = () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const scrollThreshold = 50; // pixels from bottom
+    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= scrollThreshold;
+    setIsAtBottom(atBottom);
+    if (atBottom) {
+      setUnreadCount(0);
+    }
+  };
+  
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,7 +226,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
           )}
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-hidden p-0 relative">
+        <CardContent ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-hidden p-0 relative">
           <div className="bg-[#ECE5DD] p-4 space-y-2 h-full overflow-y-auto">
             {messages.map((msg, index) => (
               <MessageBubble
@@ -215,6 +243,16 @@ function ChatWindow({ chat }: ChatWindowProps) {
             ))}
             <div ref={bottomRef} />
           </div>
+          {!isAtBottom && unreadCount > 0 && (
+            <Button
+              onClick={scrollToBottom}
+              variant="secondary"
+              className="absolute bottom-4 right-1/2 translate-x-1/2 rounded-full h-10 shadow-lg"
+            >
+              <ChevronDown className="h-5 w-5 mr-2" />
+              {unreadCount} New Message{unreadCount > 1 ? 's' : ''}
+            </Button>
+          )}
         </CardContent>
 
         {isBlocked ? (
@@ -284,5 +322,3 @@ function ChatWindow({ chat }: ChatWindowProps) {
 }
 
 export default React.memo(ChatWindow);
-
-    
