@@ -2,7 +2,7 @@
 
 import type { User, Chat, ApiMessage, RegisterPayload, ApiContact, Contact, CreateChatPayload, AddContactPayload, UpdateProfilePayload, UpdateContactPayload, ChatMessage } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // 🔑 Get JWT token from localStorage
 function getToken(): string | null {
@@ -28,6 +28,9 @@ export function getCurrentUserId(): number | null {
 
 // 🌐 Common fetch wrapper
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
+  if (!API_BASE_URL) {
+    throw new Error('API base URL is not configured. Please set NEXT_PUBLIC_API_URL.');
+  }
   const url = `${API_BASE_URL}${endpoint}`;
   const token = getToken();
 
@@ -169,6 +172,9 @@ export async function sendImage(chatId: string, file: File, temp_id: string): Pr
 
 
 export async function login(username: string, password: string) {
+    if (!API_BASE_URL) {
+      throw new Error('API base URL is not configured. Please set NEXT_PUBLIC_API_URL.');
+    }
     console.log('Attempting login for:', username);
     
     const response = await fetch(`${API_BASE_URL}/auth/token/`, {
@@ -196,6 +202,9 @@ export async function login(username: string, password: string) {
 
 /** 🆕 Register a new user */
 export async function register(payload: RegisterPayload): Promise<User> {
+    if (!API_BASEURL) {
+      throw new Error('API base URL is not configured. Please set NEXT_PUBLIC_API_URL.');
+    }
     console.log('Registering user:', payload.username);
 
     const response = await fetch(`${API_BASE_URL}/auth/register/`, {

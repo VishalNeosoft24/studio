@@ -1,13 +1,11 @@
 
-
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, ApiMessage } from '@/types';
 import { getCurrentUserId, getMessages, sendImage } from '@/lib/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL;
 
 export function useChat(chatId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -46,7 +44,7 @@ export function useChat(chatId: string) {
   }, [token, chatId, currentUserId, evaluateStatus]);
 
   useEffect(() => {
-    if (!token || !chatId) return;
+    if (!token || !chatId || !WS_BASE_URL) return;
 
     const connect = () => {
       const ws = new WebSocket(
@@ -57,7 +55,7 @@ export function useChat(chatId: string) {
       ws.onopen = () => console.log("WS Connected");
       ws.onclose = (e) => {
         console.log("WS Disconnected, attempting to reconnect...", e.code, e.reason);
-        if (e.code !== 1000) {
+        if (e.code !== 1000) { // Don't reconnect on normal close
             setTimeout(connect, 5000);
         }
       };
@@ -196,7 +194,7 @@ export function useChat(chatId: string) {
     const optimisticMessage: ChatMessage = {
       id: temp_id,
       temp_id: temp_id,
-      content: '', // Or a caption if you have one
+      content: '', 
       image_url: previewUrl,
       sender: currentUserId,
       status: 'sending',
@@ -207,18 +205,12 @@ export function useChat(chatId: string) {
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
-      // The REST API call will trigger the WebSocket broadcast from the backend
       await sendImage(chatId, file, temp_id);
     } catch (error) {
       console.error("Image upload failed:", error);
-      // Handle failed upload: remove optimistic message or mark as failed
       setMessages(prev => prev.map(msg => 
         msg.id === temp_id ? { ...msg, status: 'sent', pending: false, content: "Failed to send image." } : msg
       ));
-    } finally {
-      // It's a good practice to revoke the object URL to free up memory
-      // But we need to be careful not to do it before the final image is loaded
-      // We will rely on WS message to replace this one. If WS fails, this might be an issue.
     }
   }, [chatId, currentUserId]);
 
