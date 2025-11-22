@@ -53,13 +53,21 @@ export function useChat(chatId: string) {
       wsRef.current = ws;
 
       ws.onopen = () => console.log("WS Connected");
+      
       ws.onclose = (e) => {
-        console.log("WS Disconnected, attempting to reconnect...", e.code, e.reason);
-        if (e.code !== 1000) { // Don't reconnect on normal close
+        console.error(
+          `WS Disconnected. Code: ${e.code}, Reason: ${e.reason}. Attempting to reconnect...`
+        );
+        // Standard close codes: 1000 (Normal), 1001 (Going Away), 1005 (No Status Received)
+        // We will attempt to reconnect on any other code.
+        if (e.code !== 1000 && e.code !== 1001 && e.code !== 1005) {
             setTimeout(connect, 5000);
         }
       };
-      ws.onerror = (e) => console.error("WS ERROR:", e);
+      
+      ws.onerror = (e) => {
+        console.error("WS ERROR:", e);
+      };
 
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -89,7 +97,7 @@ export function useChat(chatId: string) {
 
     return () => {
       if (wsRef.current) {
-        wsRef.current.close();
+        wsRef.current.close(1000, "Component unmounting");
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,7 +170,10 @@ export function useChat(chatId: string) {
   };
 
   const sendMessage = useCallback((text: string) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+      console.error("Cannot send message, WebSocket is not open.");
+      return;
+    }
 
     const temp_id = Date.now().toString();
     const optimistic: ChatMessage = {
@@ -205,9 +216,12 @@ export function useChat(chatId: string) {
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
+      // The actual upload is fire-and-forget from the client's perspective now.
+      // The WebSocket message will confirm the final URL.
       await sendImage(chatId, file, temp_id);
     } catch (error) {
       console.error("Image upload failed:", error);
+      // Revert optimistic update on failure
       setMessages(prev => prev.map(msg => 
         msg.id === temp_id ? { ...msg, status: 'sent', pending: false, content: "Failed to send image." } : msg
       ));
@@ -216,7 +230,10 @@ export function useChat(chatId: string) {
 
 
   const sendTyping = useCallback((isTyping: boolean) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+        // It's okay to fail silently here, typing is not critical
+        return;
+    }
     wsRef.current?.send(
       JSON.stringify({
         message_type: "typing",
@@ -226,7 +243,10 @@ export function useChat(chatId: string) {
   }, []);
 
   const sendReadStatus = useCallback((messageId: number | string) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+      // It's okay to fail silently here, read status will sync eventually
+      return;
+    }
     if (readSentSet.current.has(messageId)) return;
     readSentSet.current.add(messageId);
     wsRef.current?.send(
