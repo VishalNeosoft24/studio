@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ChatMessage, ApiMessage } from '@/types';
 import { getCurrentUserId, getMessages, sendImage } from '@/lib/api';
 
-const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL;
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://127.0.0.1:8000';
 
 export function useChat(chatId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -47,6 +47,10 @@ export function useChat(chatId: string) {
     if (!token || !chatId || !WS_BASE_URL) return;
 
     const connect = () => {
+      // Prevent multiple connections
+      if (wsRef.current && wsRef.current.readyState < 2) {
+          return;
+      }
       const ws = new WebSocket(
         `${WS_BASE_URL}/ws/chat/${chatId}/?token=${token}`
       );
@@ -58,9 +62,7 @@ export function useChat(chatId: string) {
         console.error(
           `WS Disconnected. Code: ${e.code}, Reason: ${e.reason}. Attempting to reconnect...`
         );
-        // Standard close codes: 1000 (Normal), 1001 (Going Away), 1005 (No Status Received)
-        // We will attempt to reconnect on any other code.
-        if (e.code !== 1000 && e.code !== 1001 && e.code !== 1005) {
+        if (e.code !== 1000) { // 1000 is normal closure
             setTimeout(connect, 5000);
         }
       };
@@ -216,22 +218,19 @@ export function useChat(chatId: string) {
     setMessages(prev => [...prev, optimisticMessage]);
 
     try {
-      // The actual upload is fire-and-forget from the client's perspective now.
-      // The WebSocket message will confirm the final URL.
       await sendImage(chatId, file, temp_id);
     } catch (error) {
       console.error("Image upload failed:", error);
-      // Revert optimistic update on failure
       setMessages(prev => prev.map(msg => 
         msg.id === temp_id ? { ...msg, status: 'sent', pending: false, content: "Failed to send image." } : msg
       ));
+      URL.revokeObjectURL(previewUrl);
     }
   }, [chatId, currentUserId]);
 
 
   const sendTyping = useCallback((isTyping: boolean) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) {
-        // It's okay to fail silently here, typing is not critical
         return;
     }
     wsRef.current?.send(
@@ -244,7 +243,6 @@ export function useChat(chatId: string) {
 
   const sendReadStatus = useCallback((messageId: number | string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) {
-      // It's okay to fail silently here, read status will sync eventually
       return;
     }
     if (readSentSet.current.has(messageId)) return;
