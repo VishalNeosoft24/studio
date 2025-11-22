@@ -34,8 +34,8 @@ function ChatWindow({ chat }: ChatWindowProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [isCameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const {
     messages,
@@ -103,6 +103,7 @@ function ChatWindow({ chat }: ChatWindowProps) {
     const file = dataURLtoFile(dataUrl, `capture-${Date.now()}.png`);
     sendImageMessage(file);
   };
+
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
@@ -283,3 +284,5 @@ function ChatWindow({ chat }: ChatWindowProps) {
 }
 
 export default React.memo(ChatWindow);
+
+    
